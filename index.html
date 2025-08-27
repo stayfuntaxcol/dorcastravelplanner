@@ -451,14 +451,6 @@
 
   // ---- REVIEWS (Manager → CD → HR) ----
 
-  <section id="tab-reviews" class="tab card hidden">
-  <h3>Te beoordelen reizen</h3>
-  <div id="reviewsList" class="card"></div>
-
-  <h3 style="margin-top:8px">Alle reizen (read-only)</h3>
-  <div id="reviewsAll" class="card"></div>
-</section>
-
   const reviewsList = $("#reviewsList");
   function approvalButtons(tripId, step, currentDecision){
     const disabled = currentDecision!=='pending' ? 'disabled' : '';
