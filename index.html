@@ -1,0 +1,22 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() { return request.auth != null; }
+    function isDorcas() { return isSignedIn() && request.auth.token.email.matches('.*@dorcas\\.nl$'); }
+    match /users/{uid} {
+      allow read: if isDorcas();
+      allow create: if isDorcas() && request.auth.uid == uid;
+      allow update: if isDorcas() && request.auth.uid == uid;
+    }
+    match /trips/{tripId} {
+      allow read: if isDorcas();
+      allow create: if isDorcas();
+      allow update: if isDorcas() && resource.data.travelerUid == request.auth.uid;
+    }
+    match /trips/{tripId}/approvals/{stepId} {
+      allow read: if isDorcas();
+      // in V1 laten we elke Dorcas-gebruiker de eigen reviewactie schrijven; verfijn later met roles
+      allow create, update: if isDorcas();
+    }
+  }
+}
