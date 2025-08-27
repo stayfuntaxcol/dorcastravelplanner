@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Dorcas Year Planner — V1.2</title>
+  <title>Dorcas Year Planner — V1</title>
   <style>
     :root{
-      --green:#1f9d55; --orange:#ff8c00; --red:#c53030; --ink:#1f2937; --bg:#f7fafc; --muted:#718096; --line:#e2e8f0; --white:#fff;
+      --green:#1f9d55; --orange:#ff8c00; --red:#c53030; --ink:#1f2937; --bg:#f7fafc; --muted:#718096; --line:#e2e8f0;
     }
     *{box-sizing:border-box} body{margin:0;font:14px/1.4 system-ui,Segoe UI,Roboto,Helvetica,Arial;background:var(--bg);color:var(--ink)}
     header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}
@@ -15,14 +15,14 @@
     nav{display:flex;gap:8px;flex-wrap:wrap}
     nav button{border:1px solid var(--line);background:#fff;padding:8px 10px;border-radius:10px;cursor:pointer}
     nav button.active{border-color:var(--green);color:#fff;background:var(--green)}
-    main{max-width:1200px;margin:16px auto;padding:0 12px}
+    main{max-width:1100px;margin:16px auto;padding:0 12px}
     .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
     .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
     .row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
     label{display:flex;flex-direction:column;gap:6px}
     input,select,textarea{padding:8px;border:1px solid var(--line);border-radius:8px;background:#fff}
     .muted{color:var(--muted);font-size:12px}
-    .btn{padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:#fff;cursor:pointer}
+    .btn{padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:#fff;cursor:pointer}
     .btn.primary{background:var(--green);border-color:var(--green);color:#fff}
     .btn.warn{background:var(--orange);border-color:var(--orange);color:#fff}
     .pill{padding:4px 8px;border-radius:999px;font-size:12px;border:1px solid var(--line);display:inline-block}
@@ -30,24 +30,18 @@
     .pill.green{background:#ecfdf5;border-color:#bbf7d0;color:#065f46}
     .pill.red{background:#fff1f2;border-color:#fecdd3;color:#9f1239}
     table{width:100%;border-collapse:collapse}
-    th,td{padding:8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+    th,td{padding:8px;border-bottom:1px solid var(--line);text-align:left}
     .right{text-align:right}
     .hidden{display:none !important}
     .status-dot{width:10px;height:10px;border-radius:50%;display:inline-block;vertical-align:middle;margin-right:6px}
     .dot-orange{background:var(--orange)} .dot-green{background:var(--green)} .dot-red{background:var(--red)}
-    .actions{display:flex;gap:6px;flex-wrap:wrap}
-    .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-    /* Modal */
-    #modal.backdrop{position:fixed;inset:0;background:rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;z-index:1000}
-    #modal .panel{background:var(--white);border-radius:12px;border:1px solid var(--line);max-width:720px;width:96%;max-height:80vh;overflow:auto;padding:12px}
-    #modal h3{margin:0 0 8px}
-    @media (max-width:800px){.row,.row-3{grid-template-columns:1fr}}
+    @media (max-width:700px){.row,.row-3{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
 
 <header>
-  <div class="brand"><div class="dot"></div><strong>Dorcas Year Planner — V1.2</strong></div>
+  <div class="brand"><div class="dot"></div><strong>Dorcas Year Planner — V1</strong></div>
   <div id="authArea">
     <span id="who" class="muted"></span>
     <button id="logoutBtn" class="btn hidden">Log uit</button>
@@ -66,34 +60,34 @@
         <input id="password" type="password" placeholder="••••••••"/>
       </label>
     </div>
-    <div class="toolbar" style="margin-top:8px">
+    <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
       <button id="loginBtn" class="btn primary">Log in</button>
       <button id="signupBtn" class="btn">Account aanmaken</button>
+      <label style="margin-left:auto;display:flex;gap:6px;align-items:center">
+        <input id="extToggle" type="checkbox"/> Uitgebreide gebruikersinvoer (optioneel)
+      </label>
     </div>
-    <details style="margin-top:8px">
-      <summary>Uitgebreide gebruikersinvoer (optioneel bij aanmaken)</summary>
-      <div class="row" style="margin-top:8px">
-        <label>Volledige naam
-          <input id="fullName" placeholder="Voornaam Achternaam"/>
-        </label>
-        <label>Afdeling
-          <input id="department" placeholder="Bijv. Partnerships / Anders"/>
-        </label>
-        <label>Country Office
-          <input id="office" placeholder="Bijv. Kenya / Anders"/>
-        </label>
-        <label>Rol
-          <select id="role">
-            <option value="traveler">Reiziger</option>
-            <option value="manager">Afdelingsmanager</option>
-            <option value="cd">Country Director</option>
-            <option value="hr">HR/Safety</option>
-            <option value="admin">Admin</option>
-          </select>
-        </label>
-      </div>
-    </details>
-    <p class="muted">Alleen *@dorcas.nl* toegestaan. Rollen beheer je als admin via Firestore of Admin-UI.</p>
+    <div id="extendedUser" class="row hidden" style="margin-top:10px">
+      <label>Volledige naam
+        <input id="fullName" placeholder="Voornaam Achternaam"/>
+      </label>
+      <label>Afdeling (lijst of Anders)
+        <input id="department" placeholder="Bijv. Partnerships / Anders"/>
+      </label>
+      <label>Country Office (lijst of Anders)
+        <input id="office" placeholder="Bijv. Kenya / Anders"/>
+      </label>
+      <label>Rol
+        <select id="role">
+          <option value="traveler">Reiziger</option>
+          <option value="manager">Afdelingsmanager</option>
+          <option value="cd">Country Director</option>
+          <option value="hr">HR/Safety</option>
+          <option value="admin">Admin</option>
+        </select>
+      </label>
+    </div>
+    <p class="muted">Tip: voor V1 is registratie beperkt tot *@dorcas.nl*. Rollen kun je later in Admin fine-tunen.</p>
   </section>
 
   <!-- NAV -->
@@ -106,13 +100,7 @@
 
   <!-- TRIPS -->
   <section id="tab-trips" class="tab card">
-    <div class="toolbar" style="justify-content:space-between">
-      <h3 style="margin:0">Nieuwe voorgenomen reis <span class="pill orange"><span class="status-dot dot-orange"></span>oranje</span></h3>
-      <label style="display:flex;align-items:center;gap:6px">
-        <input id="tripExtendedToggle" type="checkbox"/> Uitgebreide velden
-      </label>
-    </div>
-
+    <h3>Nieuwe voorgenomen reis <span class="pill orange"><span class="status-dot dot-orange"></span>oranje</span></h3>
     <form id="tripForm">
       <div class="row">
         <label>Titel
@@ -121,27 +109,10 @@
         <label>Type reiziger
           <select id="f-travelerType">
             <option value="medewerker" selected>Medewerker</option>
-            <option value="externe-partner">Externe Partner</option>
+            <option value="partner">Partner</option>
           </select>
         </label>
       </div>
-
-      <div id="tripExtendedBox" class="hidden">
-        <div class="row">
-          <label>Organisatie/Bedrijf (bij Externe Partner) — optioneel
-            <input id="f-org" placeholder="Naam organisatie/bedrijf"/>
-          </label>
-          <label>CombiCode (koppel meerdere reizen)
-            <input id="f-combi" placeholder="Bijv. Q4-KE-TZ-2025"/>
-          </label>
-        </div>
-        <div class="row">
-          <label style="display:flex;flex-direction:row;align-items:center;gap:8px;margin-top:8px">
-            <input id="f-ioBudget" type="checkbox" checked/> IO Budget meerekenen (standaard aan)
-          </label>
-        </div>
-      </div>
-
       <div class="row-3">
         <label>Afdeling
           <input id="f-department" list="departments" placeholder="Kies of typ Anders"/>
@@ -155,7 +126,6 @@
           <input id="f-city" placeholder="Bijv. Arusha"/>
         </label>
       </div>
-
       <div class="row-3">
         <label>Startdatum
           <input id="f-start" type="date" required/>
@@ -167,7 +137,6 @@
           <input id="f-count" type="number" min="1" value="1"/>
         </label>
       </div>
-
       <div class="row">
         <label>Doel (Purpose of Travel)
           <select id="f-purpose">
@@ -190,14 +159,12 @@
           </select>
         </label>
       </div>
-
-      <div class="row" style="align-items:end">
+      <div class="row">
         <div>
-          <div class="muted">Budget default: €2.500 p.p. — CO₂ default: 2.5 t per persoon</div>
-          <div id="calcLine" class="muted">Totaal (schatting): Budget 2.500 • 2.5 t • 0 dagen</div>
+          <div class="muted">Budget default: €2.500 p.p. — CO₂ default: 2.0 t p.p. </div>
+          <div id="calcLine" class="muted">Totaal (schatting): €2.500 • 2.0 t</div>
         </div>
         <div style="text-align:right">
-          <button class="btn" id="cancelEditBtn" type="button" style="display:none">Annuleer bewerken</button>
           <button class="btn warn" type="reset">Reset</button>
           <button class="btn primary" type="submit">Opslaan (oranje)</button>
         </div>
@@ -205,11 +172,11 @@
     </form>
 
     <h3 style="margin-top:10px">Mijn reizen</h3>
-    <div class="card" style="padding:0;overflow:auto">
+    <div class="card" style="padding:0">
       <table id="tripsTable">
         <thead>
           <tr>
-            <th>Status</th><th>Afdeling</th><th>CO</th><th>Van</th><th>Tot</th><th>Qtr</th><th>Dagen</th><th>Budget</th><th>CO₂ (t)</th><th>Combi</th><th></th>
+            <th>Status</th><th>Titel</th><th>Afdeling</th><th>CO</th><th>Van</th><th>Tot</th><th>Qtr</th><th class="right">€</th><th class="right">CO₂ (t)</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -225,36 +192,21 @@
 
   <!-- CALENDAR -->
   <section id="tab-calendar" class="tab card hidden">
-    <h3>Kalender — jaarplanning</h3>
-    <div class="toolbar" style="margin-bottom:8px">
-      <label>Per week <input id="calWeek" type="week"/></label>
-      <label>Periode van <input id="calStart" type="date"/></label>
-      <label>tot <input id="calEnd" type="date"/></label>
-      <button class="btn" id="calToday">Vandaag</button>
-      <span class="muted">Filters:</span>
-      <select id="filStatus">
-        <option value="">Status: alles</option>
-        <option value="voorgenomen">voorgenomen</option>
-        <option value="definitief">definitief</option>
-        <option value="afgewezen">afgewezen</option>
+    <h3>Kalender (Y/Q/M/W)</h3>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <select id="calView">
+        <option value="year">Jaar</option>
+        <option value="quarter" selected>Kwartaal</option>
+        <option value="month">Maand</option>
+        <option value="week">Week</option>
       </select>
-      <select id="filDept"><option value="">Afdeling: alles</option></select>
-      <select id="filOffice"><option value="">CO: alles</option></select>
-      <select id="filQtr">
-        <option value="">Qtr: alles</option>
-        <option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option>
+      <select id="calQtr">
+        <option>Q1</option><option>Q2</option><option>Q3</option><option selected>Q4</option>
       </select>
+      <input id="calMonth" type="month"/>
+      <input id="calWeek" type="week"/>
     </div>
-    <div class="card" style="padding:0;overflow:auto">
-      <table id="calendarTable">
-        <thead>
-          <tr>
-            <th>Status</th><th>Afdeling</th><th>CO</th><th>Periode</th><th>Qtr</th><th>Dagen</th><th>Combi</th><th></th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
+    <div id="calendarArea" class="card"></div>
   </section>
 
   <!-- DASHBOARD -->
@@ -262,7 +214,7 @@
     <h3>Dashboard</h3>
     <div class="row-3">
       <div class="card"><strong># Reizen</strong><div id="kpiTrips" style="font-size:24px">0</div></div>
-      <div class="card"><strong>Euro</strong><div id="kpiBudget" style="font-size:24px">0</div></div>
+      <div class="card"><strong>€ Default</strong><div id="kpiBudget" style="font-size:24px">€0</div></div>
       <div class="card"><strong>CO₂ (t)</strong><div id="kpiCO2" style="font-size:24px">0.0</div></div>
     </div>
     <div class="card" style="margin-top:8px">
@@ -270,48 +222,42 @@
         <input id="dashDeptFilter" placeholder="Bijv. Partnerships (leeg = alles)"/>
       </label>
       <div id="dashTableWrap" style="margin-top:8px"></div>
-      <div id="dashDetailWrap" class="card" style="margin-top:8px"></div>
     </div>
   </section>
 </main>
-
-<!-- MODAL -->
-<div id="modal" class="hidden"></div>
 
 <script type="module">
   // Firebase SDKs
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
   import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-analytics.js";
   import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
-  import { getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, onSnapshot, query, where, orderBy, serverTimestamp, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+  import { getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, onSnapshot, query, where, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
-  // --- CONFIG ---
+  // --- CONFIG (gebruik jouw project) ---
   const firebaseConfig = {
     apiKey: "AIzaSyAh8NlJEsAimk5XetB46b4hVmT83ZbHc4o",
     authDomain: "dorcas-travel-planner.firebaseapp.com",
     projectId: "dorcas-travel-planner",
+    storageBucket: "dorcas-travel-planner.firebasestorage.app",
     messagingSenderId: "964093814653",
     appId: "1:964093814653:web:5f5a542f9593f82cfe0e14",
     measurementId: "G-PZ3N4JRKQ3"
   };
 
   const app = initializeApp(firebaseConfig);
-  try { getAnalytics(app); } catch(e) {}
+  try { getAnalytics(app); } catch(e) {} // analytics optional
   const auth = getAuth(app);
   const db = getFirestore(app);
 
   // --- UI helpers ---
   const $ = sel => document.querySelector(sel);
   const $$ = sel => Array.from(document.querySelectorAll(sel));
-  const fmtEUR = v => (v||0).toLocaleString('nl-NL', {maximumFractionDigits:0});
+  const fmtEUR = v => '€' + (v||0).toLocaleString('nl-NL', {maximumFractionDigits:0});
   const fmtDate = s => s ? new Date(s).toLocaleDateString('nl-NL') : '';
-  const fmtPeriod = (a,b)=> `${fmtDate(a)} – ${fmtDate(b)}`;
-  const daysBetween = (a,b)=> {
-    const d1 = new Date(a), d2 = new Date(b);
-    const ms = d2 - d1;
-    return Math.floor(ms/(1000*60*60*24)) + 1; // inclusief
+  const getQtr = s => {
+    const d = new Date(s); const m = d.getMonth()+1;
+    return m<=3?'Q1':m<=6?'Q2':m<=9?'Q3':'Q4';
   };
-  const getQtr = s => { const m = (new Date(s)).getMonth()+1; return m<=3?'Q1':m<=6?'Q2':m<=9?'Q3':'Q4'; };
 
   // Seed lijsten (kun je later uit Firestore laden)
   const DEPARTMENTS = ["Engagement & Fundraising","Partnerships","HRM","Finance","IT","PKS","Quality Management","Shops & Textiles","Country Programmes","Anders"];
@@ -319,11 +265,6 @@
   const depDL = $("#departments"), offDL = $("#offices");
   DEPARTMENTS.forEach(x=>{ const o=document.createElement('option'); o.value=x; depDL.appendChild(o); });
   OFFICES.forEach(x=>{ const o=document.createElement('option'); o.value=x; offDL.appendChild(o); });
-
-  // populate calendar filters
-  const filDept = $("#filDept"), filOffice=$("#filOffice");
-  DEPARTMENTS.forEach(x=>{ const op=document.createElement('option'); op.value=x; op.textContent=x; filDept.appendChild(op); });
-  OFFICES.forEach(x=>{ const op=document.createElement('option'); op.value=x; op.textContent=x; filOffice.appendChild(op); });
 
   // Tabs
   const navBar = $("#navBar");
@@ -338,7 +279,9 @@
   // Auth UI
   const authCard = $("#authCard"), who = $("#who"), logoutBtn=$("#logoutBtn");
   const email = $("#email"), password=$("#password"), loginBtn=$("#loginBtn"), signupBtn=$("#signupBtn");
+  const extToggle=$("#extToggle"), extBox=$("#extendedUser");
   const fullName=$("#fullName"), department=$("#department"), office=$("#office"), role=$("#role");
+  extToggle.addEventListener('change', ()=> extBox.classList.toggle('hidden', !extToggle.checked));
 
   // Dorcas-domein check
   const isDorcasMail = (m)=>/@dorcas\.nl$/i.test(m||'');
@@ -365,27 +308,30 @@
   loginBtn.onclick = async ()=>{
     try{
       if(!isDorcasMail(email.value)) return alert("Alleen @dorcas.nl toegestaan.");
-      await signInWithEmailAndPassword(auth, email.value, password.value);
-    }catch(e){ alert(e.code + ' — ' + e.message); }
+      const cred = await signInWithEmailAndPassword(auth, email.value, password.value);
+    }catch(e){ alert(e.message); }
   };
   signupBtn.onclick = async ()=>{
     try{
       if(!isDorcasMail(email.value)) return alert("Alleen @dorcas.nl toegestaan.");
       const cred = await createUserWithEmailAndPassword(auth, email.value, password.value);
-      if(fullName.value) await updateProfile(cred.user, {displayName: fullName.value});
-      await ensureUserDoc(cred.user, {
-        displayName: fullName.value||'',
-        department: department.value||'',
-        office: office.value||'',
-        role: role.value||'traveler'
-      });
-    }catch(e){ alert(e.code + ' — ' + e.message); }
+      if(extToggle.checked){
+        if(fullName.value) await updateProfile(cred.user, {displayName: fullName.value});
+        await ensureUserDoc(cred.user, {
+          displayName: fullName.value||'',
+          department: department.value||'',
+          office: office.value||'',
+          role: role.value||'traveler'
+        });
+      } else {
+        await ensureUserDoc(cred.user); // minimal
+      }
+    }catch(e){ alert(e.message); }
   };
   logoutBtn.onclick = ()=> signOut(auth);
 
   // State
   let currentUser = null, currentUserDoc = null;
-  let editingTripId = null; // for edit mode
 
   onAuthStateChanged(auth, async (user)=>{
     currentUser = user || null;
@@ -409,131 +355,66 @@
     loadMyTrips();
     loadReviewQueue();
     loadDashboard();
-    initCalendarDefaults();
     buildCalendar();
   });
 
   // ---- TRIP FORM ----
-  const tripExtendedToggle = $("#tripExtendedToggle");
-  const tripExtendedBox = $("#tripExtendedBox");
-  tripExtendedToggle.addEventListener('change', ()=> tripExtendedBox.classList.toggle('hidden', !tripExtendedToggle.checked));
-
   const f = {
     title: $("#f-title"), travelerType:$("#f-travelerType"),
-    org: $("#f-org"), combi: $("#f-combi"), ioBudget: $("#f-ioBudget"),
-    department: $("#f-department"), country:$("#f-country"), city:$("#f-city"),
+    department:$("#f-department"), country:$("#f-country"), city:$("#f-city"),
     start:$("#f-start"), end:$("#f-end"), purpose:$("#f-purpose"), transport:$("#f-transport"),
     count:$("#f-count"), calcLine:$("#calcLine")
   };
-  const DEFAULT_EUR_PP = 2500; const DEFAULT_TON_CO2_PP = 2.5;
+  const DEFAULT_EUR_PP = 2500; const DEFAULT_TON_CO2_PP = 2.0;
 
-  function recalcDisplay(){
+  function refreshCalc(){
     const c = Math.max(1, parseInt(f.count.value||'1',10));
-    const io = f.ioBudget.checked;
-    const combiFactor = f.combi.value.trim() ? 0.5 : 1;
-    const budgetBase = DEFAULT_EUR_PP * c;
-    const budgetEff = io ? budgetBase * combiFactor : 0;
-    const co2Eff = (DEFAULT_TON_CO2_PP * c) * combiFactor;
-    let days = 0;
-    if(f.start.value && f.end.value){
-      try { days = daysBetween(f.start.value, f.end.value); } catch(_){}
-    }
-    f.calcLine.textContent = `Totaal (schatting): Budget ${fmtEUR(budgetEff)} • ${co2Eff.toFixed(1)} t • ${days} dagen`;
+    f.calcLine.textContent = `Totaal (schatting): ${fmtEUR(DEFAULT_EUR_PP*c)} • ${(DEFAULT_TON_CO2_PP*c).toFixed(1)} t`;
   }
-  ['input','change'].forEach(ev=> {
-    f.count.addEventListener(ev, recalcDisplay);
-    f.ioBudget.addEventListener(ev, recalcDisplay);
-    f.combi.addEventListener(ev, recalcDisplay);
-    f.start.addEventListener(ev, recalcDisplay);
-    f.end.addEventListener(ev, recalcDisplay);
-  });
-  recalcDisplay();
-
-  $("#f-travelerType").addEventListener('change', ()=>{
-    // show org hint IF externe partner + extended
-    const show = tripExtendedToggle.checked && f.travelerType.value === 'externe-partner';
-    f.org.parentElement.classList.toggle('hidden', !show);
-  });
-
-  const cancelEditBtn = $("#cancelEditBtn");
-  cancelEditBtn.onclick = ()=>{
-    editingTripId = null;
-    $("#tripForm").reset();
-    f.count.value = 1;
-    f.ioBudget.checked = true;
-    f.combi.value='';
-    recalcDisplay();
-    cancelEditBtn.style.display='none';
-  };
-
-  $("#tripForm").addEventListener('reset', ()=> setTimeout(recalcDisplay, 0));
+  ['input','change'].forEach(ev=> f.count.addEventListener(ev, refreshCalc));
+  refreshCalc();
 
   $("#tripForm").addEventListener('submit', async (e)=>{
     e.preventDefault();
     if(!currentUser) return alert("Log eerst in.");
-
     const c = Math.max(1, parseInt(f.count.value||'1',10));
     const startISO = f.start.value, endISO = f.end.value;
     if(!startISO || !endISO) return alert("Start- en einddatum zijn verplicht.");
-    if(new Date(endISO) <= new Date(startISO)) return alert("Einddatum moet later zijn dan begindatum.");
-
     const qtr = getQtr(startISO);
-    const days = daysBetween(startISO, endISO);
-    const combi = f.combi.value.trim();
-    const combiFactor = combi ? 0.5 : 1;
-    const io = f.ioBudget.checked;
-    const budgetBase = DEFAULT_EUR_PP * c;
-    const budgetDefaultTotal = budgetBase;
-    const budgetEffectiveTotal = io ? budgetBase * combiFactor : 0;
-    const co2Base = (DEFAULT_TON_CO2_PP * c);
-    const co2EffectiveTotalTon = +(co2Base * combiFactor).toFixed(1);
-
     const docData = {
       title: f.title.value.trim(),
       travelerUid: currentUser.uid,
       travelerName: currentUser.displayName || (currentUserDoc?.displayName||''),
       travelerType: f.travelerType.value,
-      externalOrgName: f.travelerType.value==='externe-partner' ? (f.org.value||'') : '',
-      ioBudget: io,
-      combiCode: combi,
       department: f.department.value || (currentUserDoc?.department||''),
       officeCountry: f.country.value || (currentUserDoc?.office||''),
       city: f.city.value || '',
       startDate: startISO, endDate: endISO, qtr,
       purpose: f.purpose.value, transport: f.transport.value,
       travelersCount: c,
-      durationDays: days,
       budgetDefaultPerPerson: DEFAULT_EUR_PP,
-      budgetDefaultTotal,
-      budgetEffectiveTotal,
+      budgetDefaultTotal: DEFAULT_EUR_PP*c,
       co2DefaultPerPersonTon: DEFAULT_TON_CO2_PP,
-      co2TotalTon: +co2Base.toFixed(1),
-      co2EffectiveTotalTon,
-      status: "voorgenomen",
+      co2TotalTon: +(DEFAULT_TON_CO2_PP*c).toFixed(1),
+      status: "voorgenomen", // oranje
       createdAt: serverTimestamp(),
       currency: "EUR"
     };
-
     try{
-      if(editingTripId){
-        await updateDoc(doc(db,'trips', editingTripId), docData);
-        alert("Reis bijgewerkt.");
-      }else{
-        const tripsRef = collection(db,'trips');
-        const added = await addDoc(tripsRef, docData);
-        // Initialize approvals (pending) — toegestaan voor eigenaar (Optie B rules)
-        const steps = ['manager','cd','hr'];
-        for(const step of steps){
-          const aDoc = doc(db, `trips/${added.id}/approvals/${step}`);
-          await setDoc(aDoc, {
-            step, decision:'pending', decidedAt:null, decidedByUid:null, decidedByName:null, note:''
-          });
-        }
-        alert("Reis opgeslagen als voorgenomen (oranje).");
+      const tripsRef = collection(db,'trips');
+      const added = await addDoc(tripsRef, docData);
+      // Initialize approvals (pending)
+      const steps = ['manager','cd','hr'];
+      for(const step of steps){
+        const aDoc = doc(db, `trips/${added.id}/approvals/${step}`);
+        await setDoc(aDoc, {
+          step, decision:'pending', decidedAt:null, decidedByUid:null, decidedByName:null, note:''
+        });
       }
-      e.target.reset(); f.count.value=1; f.ioBudget.checked=true; f.combi.value=''; recalcDisplay();
-      editingTripId = null; cancelEditBtn.style.display='none';
-    }catch(err){ alert(err.code + ' — ' + err.message); }
+      e.target.reset(); f.count.value=1; refreshCalc();
+      loadMyTrips();
+      alert("Reis opgeslagen als voorgenomen (oranje).");
+    }catch(err){ alert(err.message); }
   });
 
   // ---- LIST MY TRIPS ----
@@ -546,28 +427,20 @@
   function rowTrip(t){
     return `<tr data-id="${t.id}">
       <td>${statusPill(t.status)}</td>
+      <td>${t.title||''}</td>
       <td>${t.department||''}</td>
-      <td>${t.officeCountry||''}${t.city?(' • '+t.city):''}</td>
+      <td>${t.officeCountry||''}</td>
       <td>${fmtDate(t.startDate)}</td>
       <td>${fmtDate(t.endDate)}</td>
       <td>${t.qtr||''}</td>
-      <td>${t.durationDays||daysBetween(t.startDate,t.endDate)||''}</td>
-      <td class="right">${fmtEUR(t.budgetEffectiveTotal ?? t.budgetDefaultTotal)}</td>
-      <td class="right">${(t.co2EffectiveTotalTon ?? t.co2TotalTon || 0).toFixed(1)}</td>
-      <td>${t.combiCode||''}</td>
-      <td class="right">
-        <div class="actions">
-          <button class="btn" data-act="details" data-id="${t.id}">Toon details</button>
-          <button class="btn" data-act="edit" data-id="${t.id}">Bewerk</button>
-          <button class="btn" data-act="del" data-id="${t.id}">Verwijder</button>
-        </div>
-      </td>
+      <td class="right">${fmtEUR(t.budgetDefaultTotal)}</td>
+      <td class="right">${(t.co2TotalTon||0).toFixed(1)}</td>
     </tr>`;
   }
   function loadMyTrips(){
     if(!currentUser) return;
-    const qy = query(collection(db,'trips'), where('travelerUid','==', currentUser.uid), orderBy('startDate','desc'));
-    onSnapshot(qy, (snap)=>{
+    const q = query(collection(db,'trips'), where('travelerUid','==', currentUser.uid), orderBy('startDate','desc'));
+    onSnapshot(q, (snap)=>{
       tripsTableBody.innerHTML = '';
       let rows = [];
       snap.forEach(d=> rows.push({id:d.id, ...d.data()}));
@@ -576,128 +449,64 @@
     });
   }
 
-  // Actions in trips table
-  tripsTableBody.addEventListener('click', async (e)=>{
-    const btn = e.target.closest('button[data-act]'); if(!btn) return;
-    const id = btn.dataset.id;
-    const act = btn.dataset.act;
-    const ref = doc(db,'trips', id);
-    const snap = await getDoc(ref);
-    if(!snap.exists()) return;
-    const t = {id: snap.id, ...snap.data()};
-
-    if(act==='details'){ return openDetails(t); }
-
-    if(act==='edit'){
-      if(t.status==='definitief'){ return alert('Deze reis is definitief en kan niet meer bewerkt worden.'); }
-      editingTripId = id;
-      // prefill
-      f.title.value = t.title||'';
-      f.travelerType.value = t.travelerType||'medewerker';
-      f.org.value = t.externalOrgName||'';
-      f.combi.value = t.combiCode||'';
-      f.ioBudget.checked = !!t.ioBudget;
-      f.department.value = t.department||'';
-      f.country.value = t.officeCountry||'';
-      f.city.value = t.city||'';
-      f.start.value = t.startDate||'';
-      f.end.value = t.endDate||'';
-      f.count.value = t.travelersCount||1;
-      f.purpose.value = t.purpose||'Overig';
-      f.transport.value = t.transport||'vliegtuig';
-      recalcDisplay();
-      cancelEditBtn.style.display='inline-block';
-      // scroll to top
-      window.scrollTo({top:0,behavior:'smooth'});
-      return;
-    }
-
-    if(act==='del'){
-      if(!confirm('Verwijderen? Dit kan niet ongedaan worden gemaakt.')) return;
-      try{
-        await deleteDoc(ref);
-        alert('Reis verwijderd.');
-      }catch(err){ alert(err.code + ' — ' + err.message); }
-      return;
-    }
-  });
-
-  // ---- DETAILS MODAL ----
-  const modal = $("#modal");
-  function openDetails(t){
-    const html = `
-      <div class="backdrop" id="modal" onclick="this.classList.add('hidden')">
-        <div class="panel" onclick="event.stopPropagation()">
-          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-            <h3>${t.title||'Reis'}</h3>
-            <button class="btn" onclick="document.getElementById('modal').classList.add('hidden')">Sluiten</button>
-          </div>
-          <div class="row">
-            <div>
-              <div><strong>Status</strong>: ${t.status}</div>
-              <div><strong>Afdeling</strong>: ${t.department||''}</div>
-              <div><strong>Bestemming</strong>: ${t.officeCountry||''}${t.city?(' • '+t.city):''}</div>
-              <div><strong>Periode</strong>: ${fmtPeriod(t.startDate,t.endDate)} (${t.durationDays||daysBetween(t.startDate,t.endDate)} dagen)</div>
-              <div><strong>Qtr</strong>: ${t.qtr||''}</div>
-              <div><strong>Doel</strong>: ${t.purpose||''}</div>
-              <div><strong>Vervoer</strong>: ${t.transport||''}</div>
-            </div>
-            <div>
-              <div><strong>Type reiziger</strong>: ${t.travelerType}</div>
-              ${t.externalOrgName?('<div><strong>Organisatie</strong>: '+t.externalOrgName+'</div>'):''}
-              <div><strong>Aantal reizigers</strong>: ${t.travelersCount||1}</div>
-              <div><strong>CombiCode</strong>: ${t.combiCode||'-'}</div>
-              <div><strong>IO Budget</strong>: ${t.ioBudget?'ja':'nee'}</div>
-              <div><strong>Euro</strong>: ${fmtEUR(t.budgetEffectiveTotal ?? t.budgetDefaultTotal)}</div>
-              <div><strong>CO₂ (t)</strong>: ${(t.co2EffectiveTotalTon ?? t.co2TotalTon || 0).toFixed(1)}</div>
-            </div>
-          </div>
-        </div>
-      </div>`;
-    modal.outerHTML = html; // replace to rebind close
-    document.getElementById('modal').classList.remove('hidden');
-  }
-
   // ---- REVIEWS (Manager → CD → HR) ----
   const reviewsList = $("#reviewsList");
+  function approvalButtons(tripId, step, currentDecision){
+    const disabled = currentDecision!=='pending' ? 'disabled' : '';
+    return `<div style="display:flex;gap:6px">
+      <button class="btn" data-act="approve" data-trip="${tripId}" data-step="${step}" ${disabled}>Akkoord</button>
+      <button class="btn" data-act="reject" data-trip="${tripId}" data-step="${step}" ${disabled}>Afwijzen</button>
+      <button class="btn" data-act="alt" data-trip="${tripId}" data-step="${step}" ${disabled}>Alternatief</button>
+    </div>`;
+  }
   async function loadReviewQueue(){
     if(!currentUser) return;
     const role = (currentUserDoc?.role)||'traveler';
     const step = role==='manager'?'manager': role==='cd'?'cd': role==='hr'?'hr': null;
     if(!step){ reviewsList.innerHTML = '<div class="muted">Geen reviewrechten voor jouw rol.</div>'; return; }
 
-    const qTrips = query(collection(db,'trips'), where('status','in',['voorgenomen']));
+    // Toon alle trips waar deze stap nog pending is en eerdere stappen (indien bestaan) niet afgewezen
+    const qTrips = query(collection(db,'trips'), where('status','in',['voorgenomen'])); // licht filter; client check
     onSnapshot(qTrips, async (snap)=>{
       const entries = [];
       const promises = [];
       snap.forEach(d=>{
         const trip = {id:d.id, ...d.data()};
         promises.push((async ()=>{
+          // lees approvals
           const aRef = collection(db, `trips/${trip.id}/approvals`);
           const aSnap = await getDocs(aRef);
           const ap = {}; aSnap.forEach(x=> ap[x.id]=x.data());
+          // gating: manager -> cd -> hr
           const mgr = ap['manager']?.decision||'pending';
           const cd  = ap['cd']?.decision||'pending';
           const hr  = ap['hr']?.decision||'pending';
-          const gateOK = (step==='manager') || (step==='cd' && mgr==='approved') || (step==='hr' && mgr==='approved' && cd==='approved');
+
+          const gateOK = (step==='manager')
+            || (step==='cd' && mgr==='approved')
+            || (step==='hr' && mgr==='approved' && cd==='approved');
+
           const myState = ap[step]?.decision||'pending';
-          if(gateOK && myState==='pending'){ entries.push({trip, ap}); }
+          if(gateOK && myState==='pending'){
+            entries.push({trip, ap});
+          }
         })());
       });
       await Promise.all(promises);
+      // render
       if(entries.length===0){ reviewsList.innerHTML = '<div class="muted">Geen openstaande reviews.</div>'; return; }
       reviewsList.innerHTML = '';
-      entries.forEach(({trip, ap})=>{
+      for(const {trip, ap} of entries){
         const html = `<div class="card">
           <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
             <div>
               <strong>${trip.title}</strong><br/>
               <span class="muted">${trip.department||''} • ${trip.officeCountry||''}</span><br/>
-              <span class="muted">${fmtDate(trip.startDate)} – ${fmtDate(trip.endDate)} • ${trip.qtr} • ${trip.durationDays||daysBetween(trip.startDate,trip.endDate)} dagen</span>
+              <span class="muted">${fmtDate(trip.startDate)} – ${fmtDate(trip.endDate)} • ${trip.qtr}</span>
             </div>
             <div>
               <div>${statusPill(trip.status)}</div>
-              <div class="muted right">Euro ${fmtEUR(trip.budgetEffectiveTotal ?? trip.budgetDefaultTotal)} • ${(trip.co2EffectiveTotalTon ?? trip.co2TotalTon || 0).toFixed(1)} t</div>
+              <div class="muted right">${fmtEUR(trip.budgetDefaultTotal)} • ${(trip.co2TotalTon||0).toFixed(1)} t</div>
             </div>
           </div>
           <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap">
@@ -706,120 +515,75 @@
             <div>HR: <strong>${ap.hr?.decision||'pending'}</strong></div>
           </div>
           <div style="margin-top:8px">
-            <div class="actions">
-              <button class="btn" data-approve="${trip.id}">Akkoord</button>
-              <button class="btn" data-reject="${trip.id}">Afwijzen</button>
-              <button class="btn" data-alt="${trip.id}">Alternatief</button>
-              <button class="btn" data-details="${trip.id}">Toon details</button>
-            </div>
+            ${approvalButtons(trip.id, (currentUserDoc.role), ap[currentUserDoc.role]?.decision||'pending')}
           </div>
         </div>`;
-        const wrap = document.createElement('div');
-        wrap.innerHTML = html;
-        const card = wrap.firstElementChild;
-        card.querySelector('[data-approve]')?.addEventListener('click', ()=> decide(trip.id, step, 'approved'));
-        card.querySelector('[data-reject]')?.addEventListener('click', ()=> decide(trip.id, step, 'rejected'));
-        card.querySelector('[data-alt]')?.addEventListener('click', ()=> decide(trip.id, step, 'alt', prompt('Alternatief/reden:','')));
-        card.querySelector('[data-details]')?.addEventListener('click', ()=> openDetails(trip));
-        reviewsList.appendChild(card);
-      });
+        reviewsList.insertAdjacentHTML('beforeend', html);
+      }
     });
   }
 
-  async function decide(tripId, step, decision, note=''){
+  reviewsList.addEventListener('click', async (e)=>{
+    const b = e.target.closest('button'); if(!b) return;
+    const act = b.dataset.act, tripId = b.dataset.trip, step = b.dataset.step;
+    const note = act==='alt' ? prompt("Alternatief/reden:","") : "";
+    const decision = act==='approve'?'approved': act==='reject'?'rejected':'alt';
     try{
+      // update this step
       await setDoc(doc(db,`trips/${tripId}/approvals/${step}`),{
         decision, note, decidedAt: serverTimestamp(),
-        decidedByUid: currentUser.uid, decidedByName: currentUser.displayName||currentUser.email, step
+        decidedByUid: currentUser.uid, decidedByName: currentUser.displayName||currentUser.email
       }, {merge:true});
-      // auto finalize
+
+      // check auto-finalize: all three approved
       const aSnap = await getDocs(collection(db,`trips/${tripId}/approvals`));
       const ap = {}; aSnap.forEach(x=> ap[x.id]=x.data());
       if(ap.manager?.decision==='approved' && ap.cd?.decision==='approved' && ap.hr?.decision==='approved'){
         await setDoc(doc(db,'trips',tripId), { status:'definitief' }, {merge:true});
         alert("Reis is definitief (groen).");
       }
-    }catch(err){ alert(err.code + ' — ' + err.message); }
-  }
-
-  // ---- CALENDAR ----
-  const calWeek=$("#calWeek"), calStart=$("#calStart"), calEnd=$("#calEnd"), calToday=$("#calToday"), calendarTable=$("#calendarTable tbody");
-  [calWeek, calStart, calEnd].forEach(el=> el.addEventListener('change', buildCalendar));
-  $("#filStatus").addEventListener('change', buildCalendar);
-  $("#filDept").addEventListener('change', buildCalendar);
-  $("#filOffice").addEventListener('change', buildCalendar);
-  $("#filQtr").addEventListener('change', buildCalendar);
-  calToday.addEventListener('click', ()=>{
-    const t = new Date(); const iso = t.toISOString().slice(0,10);
-    calStart.value = iso; calEnd.value = iso; calWeek.value = '';
-    buildCalendar();
+      loadReviewQueue();
+    }catch(err){ alert(err.message); }
   });
 
-  function initCalendarDefaults(){
-    const now = new Date();
-    const year = now.getFullYear();
-    calStart.value = `${year}-01-01`;
-    calEnd.value = `${year}-12-31`;
-    calWeek.value = '';
-  }
-
-  function weekRange(weekStr){
-    // Format YYYY-Www
-    if(!weekStr) return null;
-    const [y,wRaw] = weekStr.split('-W'); const w = parseInt(wRaw,10);
-    const jan4 = new Date(parseInt(y,10),0,4);
-    const day = jan4.getDay() || 7;
-    const monday = new Date(jan4); monday.setDate(jan4.getDate() - day + 1 + (w-1)*7);
-    const sunday = new Date(monday); sunday.setDate(monday.getDate()+6);
-    return [monday.toISOString().slice(0,10), sunday.toISOString().slice(0,10)];
-  }
-
+  // ---- CALENDAR (simple list by view) ----
+  const calView=$("#calView"), calQtr=$("#calQtr"), calMonth=$("#calMonth"), calWeek=$("#calWeek"), calendarArea=$("#calendarArea");
+  [calView, calQtr, calMonth, calWeek].forEach(el=> el.addEventListener('change', buildCalendar));
   function buildCalendar(){
     if(!currentUser) return;
+    const v = calView.value;
+    calendarArea.innerHTML = '';
+    // V1: we tonen gefilterde lijst (kan later Gantt worden)
     const qTrips = query(collection(db,'trips'), orderBy('startDate','asc'));
     onSnapshot(qTrips, (snap)=>{
       const rows=[]; snap.forEach(d=> rows.push({id:d.id, ...d.data()}));
-      let start = calStart.value, end = calEnd.value;
-      if(calWeek.value){
-        const wr = weekRange(calWeek.value); if(wr){ start = wr[0]; end = wr[1]; }
+      let filtered = rows;
+      if(v==='quarter'){ filtered = rows.filter(r=> r.qtr===calQtr.value); }
+      // month/week filters optioneel (V1 simplificatie)
+      const wrap = document.createElement('div');
+      if(filtered.length===0){ wrap.innerHTML='<div class="muted">Geen reizen in deze weergave.</div>'; }
+      else{
+        const tbl = document.createElement('table');
+        tbl.innerHTML = `<thead><tr><th>Status</th><th>Titel</th><th>Afdeling</th><th>CO</th><th>Periode</th><th>Qtr</th></tr></thead><tbody></tbody>`;
+        const tb = tbl.querySelector('tbody');
+        filtered.forEach(t=>{
+          tb.insertAdjacentHTML('beforeend', `<tr>
+            <td>${statusPill(t.status)}</td>
+            <td>${t.title}</td>
+            <td>${t.department||''}</td>
+            <td>${t.officeCountry||''}</td>
+            <td>${fmtDate(t.startDate)} – ${fmtDate(t.endDate)}</td>
+            <td>${t.qtr||''}</td>
+          </tr>`);
+        });
+        wrap.appendChild(tbl);
       }
-      // Filter by date overlap
-      let filtered = rows.filter(t=>{
-        if(!start || !end) return true;
-        const s = t.startDate, e = t.endDate;
-        return !(e < start || s > end);
-      });
-      const st = $("#filStatus").value, dep = $("#filDept").value, off = $("#filOffice").value, qtr = $("#filQtr").value;
-      if(st) filtered = filtered.filter(t=>t.status===st);
-      if(dep) filtered = filtered.filter(t=>t.department===dep);
-      if(off) filtered = filtered.filter(t=>t.officeCountry===off);
-      if(qtr) filtered = filtered.filter(t=>t.qtr===qtr);
-
-      calendarTable.innerHTML='';
-      if(filtered.length===0){
-        calendarTable.innerHTML = '<tr><td colspan="8" class="muted">Geen reizen binnen de selectie.</td></tr>';
-        return;
-      }
-      filtered.forEach(t=>{
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${statusPill(t.status)}</td>
-          <td>${t.department||''}</td>
-          <td>${t.officeCountry||''}${t.city?(' • '+t.city):''}</td>
-          <td>${fmtPeriod(t.startDate,t.endDate)}</td>
-          <td>${t.qtr||''}</td>
-          <td>${t.durationDays||daysBetween(t.startDate,t.endDate)||''}</td>
-          <td>${t.combiCode||''}</td>
-          <td class="right"><button class="btn" data-cal-details="${t.id}">Toon details</button></td>
-        `;
-        calendarTable.appendChild(tr);
-        tr.querySelector('[data-cal-details]').addEventListener('click', ()=> openDetails(t));
-      });
+      calendarArea.innerHTML=''; calendarArea.appendChild(wrap);
     });
   }
 
   // ---- DASHBOARD ----
-  const kpiTrips=$("#kpiTrips"), kpiBudget=$("#kpiBudget"), kpiCO2=$("#kpiCO2"), dashDeptFilter=$("#dashDeptFilter"), dashTableWrap=$("#dashTableWrap"), dashDetailWrap=$("#dashDetailWrap");
+  const kpiTrips=$("#kpiTrips"), kpiBudget=$("#kpiBudget"), kpiCO2=$("#kpiCO2"), dashDeptFilter=$("#dashDeptFilter"), dashTableWrap=$("#dashTableWrap");
   dashDeptFilter.addEventListener('input', loadDashboard);
   function loadDashboard(){
     if(!currentUser) return;
@@ -828,65 +592,36 @@
       const rows=[]; snap.forEach(d=> rows.push({id:d.id,...d.data()}));
       const dept = dashDeptFilter.value.trim().toLowerCase();
       const filtered = dept ? rows.filter(r=>(r.department||'').toLowerCase().includes(dept)) : rows;
-
       const n = filtered.length;
-      const sumBudget = filtered.reduce((a,b)=>a+(b.budgetEffectiveTotal ?? b.budgetDefaultTotal ?? 0),0);
-      const sumCO2 = filtered.reduce((a,b)=>a+(b.co2EffectiveTotalTon ?? b.co2TotalTon ?? 0),0);
+      const sumBudget = filtered.reduce((a,b)=>a+(b.budgetDefaultTotal||0),0);
+      const sumCO2 = filtered.reduce((a,b)=>a+(b.co2TotalTon||0),0);
       kpiTrips.textContent = n;
       kpiBudget.textContent = fmtEUR(sumBudget);
       kpiCO2.textContent = sumCO2.toFixed(1);
 
-      // Per afdeling aggregaat
+      // per afdeling tabel
       const group = {};
       filtered.forEach(t=>{
         const d = t.department||'Onbekend';
-        group[d] = group[d] || {n:0, euro:0, co2:0};
-        group[d].n++; group[d].euro += (t.budgetEffectiveTotal ?? t.budgetDefaultTotal ?? 0);
-        group[d].co2 += (t.co2EffectiveTotalTon ?? t.co2TotalTon ?? 0);
+        group[d] = group[d] || {n:0, eur:0, co2:0};
+        group[d].n++; group[d].eur += (t.budgetDefaultTotal||0); group[d].co2 += (t.co2TotalTon||0);
       });
       const table = document.createElement('table');
-      table.innerHTML = `<thead><tr><th>Afdeling</th><th class="right">#</th><th class="right">Euro</th><th class="right">CO₂ (t)</th></tr></thead><tbody></tbody>`;
+      table.innerHTML = `<thead><tr><th>Afdeling</th><th class="right">#</th><th class="right">€</th><th class="right">CO₂ (t)</th></tr></thead><tbody></tbody>`;
       const tb = table.querySelector('tbody');
       Object.entries(group).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([d,agg])=>{
         tb.insertAdjacentHTML('beforeend', `<tr>
-          <td>${d}</td><td class="right">${agg.n}</td><td class="right">${fmtEUR(agg.euro)}</td><td class="right">${agg.co2.toFixed(1)}</td>
+          <td>${d}</td><td class="right">${agg.n}</td><td class="right">${fmtEUR(agg.eur)}</td><td class="right">${agg.co2.toFixed(1)}</td>
         </tr>`);
       });
       dashTableWrap.innerHTML=''; dashTableWrap.appendChild(table);
-
-      // Detailtabel per reis met extra kolommen
-      const t2 = document.createElement('table');
-      t2.innerHTML = `<thead><tr>
-        <th>Afdeling</th><th>Bestemming</th><th>Vervoer</th><th>Dagen</th><th class="right">Euro</th><th class="right">CO₂ (t)</th><th>Qtr</th><th>Status</th><th>Combi</th><th></th>
-      </tr></thead><tbody></tbody>`;
-      const tb2 = t2.querySelector('tbody');
-      filtered.sort((a,b)=>(a.startDate||'').localeCompare(b.startDate));
-      filtered.forEach(t=>{
-        tb2.insertAdjacentHTML('beforeend', `<tr>
-          <td>${t.department||''}</td>
-          <td>${t.officeCountry||''}${t.city?(' • '+t.city):''}</td>
-          <td>${t.transport||''}</td>
-          <td>${t.durationDays||daysBetween(t.startDate,t.endDate)||''}</td>
-          <td class="right">${fmtEUR(t.budgetEffectiveTotal ?? t.budgetDefaultTotal)}</td>
-          <td class="right">${(t.co2EffectiveTotalTon ?? t.co2TotalTon || 0).toFixed(1)}</td>
-          <td>${t.qtr||''}</td>
-          <td>${t.status||''}</td>
-          <td>${t.combiCode||''}</td>
-          <td class="right"><button class="btn" data-dash-details="${t.id}">Toon details</button></td>
-        </tr>`);
-      });
-      dashDetailWrap.innerHTML=''; dashDetailWrap.appendChild(t2);
-      dashDetailWrap.querySelectorAll('[data-dash-details]').forEach(btn=>{
-        btn.addEventListener('click', async (e)=>{
-          const id = e.target.getAttribute('data-dash-details');
-          const s = await getDoc(doc(db,'trips', id)); if(s.exists()) openDetails({id, ...s.data()});
-        });
-      });
     });
   }
 
   // --- Init view defaults ---
-  // no-op (initCalendarDefaults called after login)
+  // Q4 focus bij start
+  calView.value = 'quarter'; calQtr.value='Q4';
+
 </script>
 </body>
 </html>
