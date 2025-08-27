@@ -161,8 +161,8 @@
       </div>
       <div class="row">
         <div>
-          <div class="muted">Budget default: €2.500 p.p. — CO₂ default: 1.0 t per persoon</div>
-          <div id="calcLine" class="muted">Totaal (schatting): €2.500 • 1.0 t</div>
+          <div class="muted">Budget default: €2.500 p.p. — CO₂ default: 2.0 t per persoon</div>
+          <div id="calcLine" class="muted">Totaal (schatting): €2.500 • 2.0 t</div>
         </div>
         <div style="text-align:right">
           <button class="btn warn" type="reset">Reset</button>
@@ -365,7 +365,7 @@
     start:$("#f-start"), end:$("#f-end"), purpose:$("#f-purpose"), transport:$("#f-transport"),
     count:$("#f-count"), calcLine:$("#calcLine")
   };
-  const DEFAULT_EUR_PP = 2500; const DEFAULT_TON_CO2_PP = 1.0;
+  const DEFAULT_EUR_PP = 2500; const DEFAULT_TON_CO2_PP = 2.0;
 
   function refreshCalc(){
     const c = Math.max(1, parseInt(f.count.value||'1',10));
