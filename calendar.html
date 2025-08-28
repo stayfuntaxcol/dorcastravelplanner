@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Dorcas Year Planner — Calendar</title>
+  <style>
+    :root{
+      --bg:#f6f7f9; --card:#fff; --ink:#111; --muted:#667085; --line:#e6e6e6;
+      --ok:#22c55e; --warn:#fb923c; --bad:#ef4444;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial;background:var(--bg);color:var(--ink)}
+    header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2}
+    h1{font-size:18px;margin:0}
+    .main{max-width:1100px;margin:24px auto;padding:0 16px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+    .btn{border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 12px;cursor:pointer}
+    .btn[disabled]{opacity:.5;cursor:not-allowed}
+    .muted{color:var(--muted)}
+    .hidden{display:none}
+    .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+    input[type="email"],input[type="password"],input[type="date"],input[type="week"],select{
+      border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff
+    }
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-top:1px solid var(--line);text-align:left}
+    th{font-weight:600;color:#475467;background:#fafafa}
+    td.right{text-align:right}
+
+    /* Pills */
+    .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:#fafafa}
+    .pill.green{background:#ecfdf5;border-color:#bbf7d0}
+    .pill.orange{background:#fff7ed;border-color:#fed7aa}
+    .pill.red{background:#fff1f2;border-color:#fecdd3}
+    .status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
+    .dot-green{background:var(--ok)} .dot-orange{background:var(--warn)} .dot-red{background:var(--bad)}
+
+    /* KPI chips */
+    .kpi-chips{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+    .kpi-chips .chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:4px 10px;font-size:12px}
+
+    /* Timeline */
+    .timeline{border:1px solid var(--line);border-radius:12px;background:#fff;overflow:hidden}
+    .timeline .head{display:grid;grid-template-columns:repeat(12,1fr);border-bottom:1px solid var(--line);font-size:12px;color:var(--muted)}
+    .timeline .head div{padding:6px 8px;text-align:center}
+    .timeline .rows{position:relative}
+    .timeline .row{display:grid;grid-template-columns:200px 1fr;border-top:1px solid var(--line)}
+    .timeline .row>div{padding:6px 8px}
+    .timeline .label{font-size:12px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .timeline .grid{position:relative;height:28px;display:grid;grid-template-columns:repeat(12,1fr)}
+    .timeline .grid div{border-left:1px dashed #eee}
+    .bar{position:absolute;height:18px;top:5px;border-radius:9px;border:1px solid var(--line)}
+    .bar.orange{background:#fff7ed;border-color:#fed7aa}
+    .bar.green{background:#ecfdf5;border-color:#bbf7d0}
+    .bar.red{background:#fff1f2;border-color:#fecdd3}
+
+    /* Auth panel */
+    .auth{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Dorcas Year Planner — Calendar</h1>
+    <div class="auth" id="authPanel">
+      <input type="email" id="email" placeholder="naam@dorcas.nl" />
+      <input type="password" id="password" placeholder="wachtwoord" />
+      <button class="btn" id="btnLogin">Inloggen</button>
+      <button class="btn" id="btnRegister">Account aanmaken</button>
+      <button class="btn hidden" id="btnLogout">Uitloggen</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <div id="domainWarn" class="card hidden">Alleen <strong>@dorcas.nl</strong> accounts zijn toegestaan.</div>
+
+    <!-- ====== KALENDER ====== -->
+    <section id="tab-calendar" class="card">
+      <h3 style="margin:0 0 10px 0">Kalender</h3>
+
+      <div class="toolbar">
+        <select id="calStatus">
+          <option value="">Status: alles</option>
+          <option value="voorgenomen">Voorgenomen</option>
+          <option value="definitief">Definitief</option>
+          <option value="afgewezen">Afgewezen</option>
+        </select>
+
+        <select id="calDept"><option value="">Afdeling: alles</option></select>
+        <select id="calOffice"><option value="">CO: alles</option></select>
+
+        <select id="calQtr">
+          <option value="">Qtr: alles</option>
+          <option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option>
+        </select>
+
+        <input id="calFrom" type="date" />
+        <input id="calTo"   type="date" />
+        <input id="calWeek" type="week" />
+        <button id="calToday" class="btn">Vandaag</button>
+        <button id="calReset" class="btn">Reset</button>
+        <button id="calOnlyApproved" class="btn">Alleen definitief</button>
+      </div>
+
+      <div class="kpi-chips">
+        <span class="chip"><span class="status-dot dot-orange"></span> Voorgenomen: <b id="calCountPending">0</b></span>
+        <span class="chip"><span class="status-dot dot-green"></span> Definitief: <b id="calCountApproved">0</b></span>
+        <span class="chip"><span class="status-dot dot-red"></span> Afgewezen: <b id="calCountRejected">0</b></span>
+      </div>
+
+      <div id="calendarTimeline" class="timeline" style="margin-bottom:8px"></div>
+
+      <div class="card" style="padding:0;overflow:auto">
+        <table id="calTable">
+          <thead>
+            <tr>
+              <th>Status</th><th>Afdeling</th><th>CO</th>
+              <th>Periode</th><th>Qtr</th><th>Dagen</th><th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <!-- Firebase + App -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+    import { getFirestore, collection, query, onSnapshot, doc, getDoc, getDocs } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+
+    // --- Firebase config (jouw project) ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyAh8NlJEsAimk5XetB46b4hVmT83ZbHc4o",
+      authDomain: "dorcas-travel-planner.firebaseapp.com",
+      projectId: "dorcas-travel-planner",
+      storageBucket: "dorcas-travel-planner.firebasestorage.app",
+      messagingSenderId: "964093814653",
+      appId: "1:964093814653:web:5f5a542f9593f82cfe0e14",
+      measurementId: "G-PZ3N4JRKQ3"
+    };
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth();
+    const db   = getFirestore();
+
+    // --- helpers ---
+    const $ = (sel)=>document.querySelector(sel);
+    const fmtDate = (s => s ? new Date(s).toLocaleDateString('nl-NL') : '');
+    const daysBetween = ((a,b)=> Math.floor((new Date(b)-new Date(a))/(1000*60*60*24))+1);
+    const statusPill = (s=>{
+      const m=(s||'').toLowerCase();
+      if(m==='definitief') return '<span class="pill green"><span class="status-dot dot-green"></span>definitief</span>';
+      if(m==='afgewezen')  return '<span class="pill red"><span class="status-dot dot-red"></span>afgewezen</span>';
+      return '<span class="pill orange"><span class="status-dot dot-orange"></span>voorgenomen</span>';
+    });
+    const openDetails = (t=> alert(JSON.stringify(t,null,2)));
+    const ymd=(date)=>{const d=new Date(date),y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),dd=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${dd}`;};
+    function weekRange(iso){
+      if(!iso || !iso.includes('-W')) return [null,null];
+      const [y, wStr] = iso.split('-W'); const w = parseInt(wStr,10), year=parseInt(y,10);
+      const jan4 = new Date(year,0,4), day = jan4.getDay() || 7;
+      const monW1 = new Date(jan4); monW1.setDate(jan4.getDate() - (day-1));
+      const mon = new Date(monW1); mon.setDate(monW1.getDate() + (w-1)*7);
+      const sun = new Date(mon);   sun.setDate(mon.getDate()+6);
+      return [mon,sun];
+    }
+    function clampDate(s, min, max){ const d=new Date(s); return d<min? new Date(min) : d>max? new Date(max) : d; }
+    function barLeftWidthWithinYear(startStr, endStr, year){
+      const yearStart = new Date(year,0,1), yearEnd=new Date(year,11,31);
+      const s = clampDate(startStr, yearStart, yearEnd);
+      const e = clampDate(endStr,   yearStart, yearEnd);
+      const total = (yearEnd - yearStart) || 1;
+      const left = ((s - yearStart) / total) * 100;
+      const width = Math.max(1, ((e - s) / total) * 100);
+      return [left, width];
+    }
+
+    // --- Auth UI ---
+    const emailEl = $('#email'), passEl = $('#password');
+    const btnLogin = $('#btnLogin'), btnRegister=$('#btnRegister'), btnLogout=$('#btnLogout');
+    const domainWarn = $('#domainWarn');
+
+    btnLogin.addEventListener('click', async ()=>{
+      try{
+        await signInWithEmailAndPassword(auth, emailEl.value.trim(), passEl.value);
+      }catch(e){ alert('Login: '+(e.code||e.message)); }
+    });
+    btnRegister.addEventListener('click', async ()=>{
+      try{
+        const mail = emailEl.value.trim();
+        if(!/@dorcas\.nl$/i.test(mail)) return alert('Gebruik een @dorcas.nl e-mail.');
+        await createUserWithEmailAndPassword(auth, mail, passEl.value);
+      }catch(e){ alert('Registreren: '+(e.code||e.message)); }
+    });
+    btnLogout.addEventListener('click', ()=> signOut(auth));
+
+    onAuthStateChanged(auth, async (u)=>{
+      const isDorcas = /@dorcas\.nl$/i.test(u?.email||'');
+      domainWarn.classList.toggle('hidden', !!isDorcas);
+      $('#btnLogout').classList.toggle('hidden', !u);
+      $('#btnLogin').classList.toggle('hidden', !!u);
+      $('#btnRegister').classList.toggle('hidden', !!u);
+      emailEl.classList.toggle('hidden', !!u);
+      passEl.classList.toggle('hidden', !!u);
+      if(u && isDorcas){ buildCalendar(); }
+    });
+    if (auth.currentUser) buildCalendar();
+
+    // --- DOM refs kalender ---
+    const calStatus = $('#calStatus');
+    const calDept   = $('#calDept');
+    const calOffice = $('#calOffice');
+    const calQtr    = $('#calQtr');
+    const calFrom   = $('#calFrom');
+    const calTo     = $('#calTo');
+    const calWeek   = $('#calWeek');
+    const calToday  = $('#calToday');
+    const calReset  = $('#calReset');
+    const calOnlyApproved = $('#calOnlyApproved');
+    const calTBody  = document.querySelector('#calTable tbody');
+    const calTimeline = $('#calendarTimeline');
+    const calCountPending  = $('#calCountPending');
+    const calCountApproved = $('#calCountApproved');
+    const calCountRejected = $('#calCountRejected');
+
+    // --- Data/state ---
+    let _calData = [];
+    let _calUnsub = null;
+
+    async function populateFilters(){
+      // Departments
+      if (calDept && calDept.options.length === 1){
+        try{
+          const snap = await getDocs(collection(db,'departments'));
+          if(!snap.empty){
+            snap.forEach(d=>{ const op=document.createElement('option'); op.value=d.id; op.textContent=d.id; calDept.appendChild(op); });
+          }
+        }catch(_){}
+      }
+      // Offices
+      if (calOffice && calOffice.options.length === 1){
+        try{
+          const snap = await getDocs(collection(db,'offices'));
+          if(!snap.empty){
+            snap.forEach(d=>{ const op=document.createElement('option'); op.value=d.id; op.textContent=d.id; calOffice.appendChild(op); });
+          }
+        }catch(_){}
+      }
+    }
+
+    function ensureDefaultYearRange(){
+      if (!calFrom.value || !calTo.value) {
+        const now = new Date(); const y = now.getFullYear();
+        calFrom.value = `${y}-01-01`;
+        calTo.value   = `${y}-12-31`;
+      }
+    }
+
+    function filterRows(){
+      ensureDefaultYearRange();
+      const s = (calStatus.value||'').toLowerCase();
+      const dep = calDept.value || '';
+      const off = calOffice.value || '';
+      const qtr = calQtr.value || '';
+      const from = calFrom.value || '';
+      const to   = calTo.value   || '';
+
+      let rows = _calData.slice();
+      rows = rows.filter(t=>{
+        if (s && (t.status||'').toLowerCase() !== s) return false;
+        if (dep && (t.department||'') !== dep) return false;
+        if (off && (t.officeCountry||'') !== off) return false;
+        if (qtr && (t.qtr||'') !== qtr) return false;
+
+        if (from || to) {
+          const start = t.startDate || '';
+          const end   = t.endDate   || '';
+          if (from && end && end < from) return false;
+          if (to && start && start > to) return false;
+        }
+        return true;
+      });
+      return rows.sort((a,b)=>(a.startDate||'').localeCompare(b.startDate||''));
+    }
+
+    function renderCounts(allRows){
+      const p = allRows.filter(t=>(t.status||'').toLowerCase()==='voorgenomen').length;
+      const a = allRows.filter(t=>(t.status||'').toLowerCase()==='definitief').length;
+      const r = allRows.filter(t=>(t.status||'').toLowerCase()==='afgewezen').length;
+      calCountPending.textContent = p;
+      calCountApproved.textContent = a;
+      calCountRejected.textContent = r;
+    }
+
+    function renderTimeline(rows){
+      const y = new Date(calFrom.value || new Date()).getFullYear();
+      const months = ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
+
+      let html = `<div class="head">${months.map(m=>`<div>${m}</div>`).join('')}</div><div class="rows">`;
+      const show = rows.slice(0, 60); // cap rijen
+      show.forEach(t=>{
+        const color = (t.status==='definitief') ? 'green' : (t.status==='afgewezen') ? 'red' : 'orange';
+        const [left,width] = barLeftWidthWithinYear(t.startDate, t.endDate, y);
+        const label = `${t.department||''} • ${t.officeCountry||''}${t.city?(' • '+t.city):''}`;
+        html += `<div class="row">
+          <div class="label" title="${(t.title||'').replace(/"/g,'&quot;')}">${label}</div>
+          <div class="grid">${'<div></div>'.repeat(12)}
+            <div class="bar ${color}" style="left:${left}%; width:${width}%;" title="${(t.title||'').replace(/"/g,'&quot;')} (${t.qtr||''})"></div>
+          </div>
+        </div>`;
+      });
+      html += `</div>`;
+      calTimeline.innerHTML = html;
+    }
+
+    function renderCalendarTable(rows){
+      calTBody.innerHTML = '';
+      if (rows.length === 0) {
+        calTBody.innerHTML = '<tr><td colspan="7" class="muted">Geen reizen in selectie.</td></tr>';
+        return;
+      }
+      rows.forEach(t=>{
+        const html = `<tr>
+          <td>${statusPill(t.status)}</td>
+          <td>${t.department||''}</td>
+          <td>${t.officeCountry||''}${t.city?(' • '+t.city):''}</td>
+          <td>${fmtDate(t.startDate)} – ${fmtDate(t.endDate)}</td>
+          <td>${t.qtr||''}</td>
+          <td>${t.durationDays || (t.startDate&&t.endDate? daysBetween(t.startDate,t.endDate): '')}</td>
+          <td class="right"><button class="btn" data-cal-details="${t.id}">Toon details</button></td>
+        </tr>`;
+        calTBody.insertAdjacentHTML('beforeend', html);
+      });
+      // details
+      calTBody.querySelectorAll('[data-cal-details]').forEach(btn=>{
+        btn.addEventListener('click', async ()=>{
+          const id = btn.getAttribute('data-cal-details');
+          try {
+            const s = await getDoc(doc(db,'trips', id));
+            if (s.exists()) openDetails({id, ...s.data()});
+          } catch(e) { alert('Details: '+(e.code||e.message)); }
+        });
+      });
+    }
+
+    function renderCalendar(){
+      const rows = filterRows();
+      renderCounts(_calData);    // counters op alle data
+      renderTimeline(rows);      // timeline op gefilterde data
+      renderCalendarTable(rows); // tabel op gefilterde data
+    }
+
+    async function buildCalendar(){
+      await populateFilters();
+      // default: huidige kalenderjaar
+      if (!$('#calFrom').value || !$('#calTo').value){
+        const now = new Date(); const y = now.getFullYear();
+        $('#calFrom').value = `${y}-01-01`;
+        $('#calTo').value   = `${y}-12-31`;
+      }
+      if (_calUnsub) { renderCalendar(); return; }
+      _calUnsub = onSnapshot(query(collection(db,'trips')), (snap)=>{
+        const rows=[]; snap.forEach(d=> rows.push({id:d.id, ...d.data()}));
+        _calData = rows;
+        renderCalendar();
+      }, (err)=>{
+        console.error('[Kalender] onSnapshot error:', err);
+        $('#calendarTimeline').innerHTML = `<div style="padding:8px;color:#b00">Kalender fout: ${err.code||err.message}</div>`;
+      });
+    }
+
+    // Events
+    [calStatus, calDept, calOffice, calQtr, calFrom, calTo].forEach(el=>{
+      el && el.addEventListener('change', renderCalendar);
+    });
+    calWeek && calWeek.addEventListener('change', ()=>{
+      const [mon, sun] = weekRange(calWeek.value);
+      if (mon && sun) {
+        calFrom.value = ymd(mon);
+        calTo.value   = ymd(sun);
+        renderCalendar();
+      }
+    });
+    calToday && calToday.addEventListener('click', ()=>{
+      const today = new Date();
+      calFrom.value = ymd(today);
+      calTo.value   = ymd(today);
+      renderCalendar();
+    });
+    calReset && calReset.addEventListener('click', ()=>{
+      calStatus.value=''; calDept.value=''; calOffice.value=''; calQtr.value='';
+      calFrom.value=''; calTo.value=''; calWeek.value='';
+      renderCalendar(); // zet weer jaar-default in render/filter
+    });
+    calOnlyApproved && calOnlyApproved.addEventListener('click', ()=>{
+      calStatus.value = 'definitief';
+      renderCalendar();
+    });
+  </script>
+</body>
+</html>
