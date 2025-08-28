@@ -449,12 +449,50 @@
     });
   }
 
-// ===================== REVIEWS (iedereen ziet pending; knoppen per rol) =====================
+<!-- =================== TAB: REVIEWS =================== -->
+<section id="tab-reviews" class="tab card">
+  <h3>Reviews</h3>
 
-// 1) DOM anchor
+  <div class="toolbar" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+    <input id="revSearch" type="search" placeholder="Zoek op titel, land, stad, afdeling, combi, partner..." style="min-width:280px">
+    <select id="revStatus">
+      <option value="voorgenomen">Status: Voorgenomen</option>
+      <option value="">Status: Alles</option>
+      <option value="definitief">Definitief</option>
+      <option value="afgewezen">Afgewezen</option>
+    </select>
+    <select id="revDept"><option value="">Afdeling: alles</option></select>
+    <select id="revQtr">
+      <option value="">Qtr: alles</option>
+      <option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option>
+    </select>
+    <button class="btn" id="revReset">Reset</button>
+  </div>
+
+  <div id="reviewsList"></div>
+</section>
+
+<script type="module">
+// ===== Fallback helpers als jouw globale helpers ontbreken =====
+const fmtDateX = window.fmtDate || (s => s ? new Date(s).toLocaleDateString('nl-NL') : '');
+const fmtEURX  = window.fmtEUR  || (n => new Intl.NumberFormat('nl-NL',{style:'currency',currency:'EUR'}).format(n||0));
+const statusPillX = window.statusPill || (s=>{
+  const m=(s||'').toLowerCase();
+  if(m==='definitief') return '<span class="pill green"><span class="status-dot dot-green"></span>definitief</span>';
+  if(m==='afgewezen')  return '<span class="pill red"><span class="status-dot dot-red"></span>afgewezen</span>';
+  return '<span class="pill orange"><span class="status-dot dot-orange"></span>voorgenomen</span>';
+});
+const openDetailsX = window.openDetails || (t => alert(JSON.stringify(t,null,2)));
+
+// ===== DOM refs =====
 const reviewsList = document.getElementById('reviewsList');
+const revSearch   = document.getElementById('revSearch');
+const revStatus   = document.getElementById('revStatus');
+const revDept     = document.getElementById('revDept');
+const revQtr      = document.getElementById('revQtr');
+const revReset    = document.getElementById('revReset');
 
-// 2) Helpers
+// ===== Helpers =====
 function actorStepFromRole(role){
   const r = (role||'').toLowerCase();
   if (r==='manager') return 'manager';
@@ -463,114 +501,220 @@ function actorStepFromRole(role){
   if (r==='admin')   return 'manager'; // admin handelt als manager
   return null; // traveler etc.
 }
-
 function approvalButtons(tripId, step, currentDecision){
   const disabled = currentDecision!=='pending' ? 'disabled' : '';
-  return `<div style="display:flex;gap:6px">
+  if(!step) return ''; // geen knoppen voor traveler
+  return `<div style="display:flex;gap:6px;flex-wrap:wrap">
     <button class="btn" data-act="approve" data-trip="${tripId}" data-step="${step}" ${disabled}>Akkoord</button>
     <button class="btn" data-act="reject"  data-trip="${tripId}" data-step="${step}" ${disabled}>Afwijzen</button>
     <button class="btn" data-act="alt"     data-trip="${tripId}" data-step="${step}" ${disabled}>Alternatief</button>
   </div>`;
 }
+function kv(label, value){
+  if(value==null || value==='') return '';
+  return `<div style="display:flex;gap:8px"><div class="muted" style="min-width:160px">${label}</div><div>${value}</div></div>`;
+}
+function boolLabel(v){ return v ? 'Ja' : 'Nee'; }
 
-// 3) Loader
+function safeText(v){ return (v==null ? '' : String(v)).replace(/[<>&]/g, s=>({ '<':'&lt;','>':'&gt;','&':'&amp;' }[s])); }
+
+// ===== Data state =====
+let _allTrips = [];    // [{trip, ap}]
+let _unsubReviews = null;
+
+// ===== Loader =====
 function loadReviewQueue(){
-  if(!currentUser) return;
+  if(!window.currentUser) return;
 
-  const myRole = (currentUserDoc?.role)||'traveler';
-  const myStep = actorStepFromRole(myRole);
-
-  // Haal ALLE trips; filter client-side naar 'voorgenomen' zodat je altijd iets ziet
+  // alles laden; filters doen we client-side
   const qTrips = query(collection(db,'trips'));
-  onSnapshot(qTrips, async (snap)=>{
+  _unsubReviews?.(); // safety
+  _unsubReviews = onSnapshot(qTrips, async (snap)=>{
     const entries=[]; const jobs=[];
     snap.forEach(d=>{
       const trip = {id:d.id, ...d.data()};
       jobs.push((async ()=>{
-        let ap={};
+        const ap={};
         try{
           const aSnap = await getDocs(collection(db, `trips/${trip.id}/approvals`));
           aSnap.forEach(x=> ap[x.id]=x.data());
-        }catch(e){
-          console.warn('[REVIEWS] approvals read failed', trip.id, e.code);
-          ap = {};
-        }
+        }catch(e){ /* readable volgens rules; anders leeg */ }
         entries.push({trip, ap});
       })());
     });
     await Promise.all(jobs);
+    _allTrips = entries;
 
-    const pending = entries.filter(({trip}) => (trip.status||'').toLowerCase()==='voorgenomen');
+    // vul afdelingen (distinct)
+    fillDepartments(entries.map(x=>x.trip));
 
-    if(!reviewsList) return;
-    if(pending.length===0){
-      reviewsList.innerHTML = '<div class="muted">Geen pending reizen gevonden.</div>';
-      return;
-    }
-
-    reviewsList.innerHTML = '';
-    pending.forEach(({trip, ap})=>{
-      const mgr = ap.manager?.decision || 'pending';
-      const cd  = ap.cd?.decision      || 'pending';
-      const hr  = ap.hr?.decision      || 'pending';
-
-      // wie mag nu beslissen?
-      const gateOK =
-        (myStep==='manager') ||
-        (myStep==='cd' && mgr==='approved') ||
-        (myStep==='hr' && mgr==='approved' && cd==='approved');
-
-      const myState = myStep ? (ap[myStep]?.decision || 'pending') : null;
-      const canAct  = !!(myStep && gateOK && myState==='pending');
-
-      const html = `<div class="card">
-        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
-          <div>
-            <strong>${trip.title || '(zonder titel)'}</strong><br/>
-            <span class="muted">${trip.department||''} • ${trip.officeCountry||''}${trip.city?(' • '+trip.city):''}</span><br/>
-            <span class="muted">${fmtDate(trip.startDate)} – ${fmtDate(trip.endDate)} • ${trip.qtr||''}</span>
-          </div>
-          <div>
-            <div>${statusPill(trip.status)}</div>
-            <div class="muted right">
-              ${fmtEUR(trip.budgetEffectiveTotal ?? trip.budgetDefaultTotal ?? 0)} •
-              ${(trip.co2EffectiveTotalTon ?? trip.co2TotalTon ?? 0).toFixed(1)} t
-            </div>
-          </div>
-        </div>
-
-        <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap">
-          <div>Manager: <strong>${mgr}</strong></div>
-          <div>CD: <strong>${cd}</strong></div>
-          <div>HR: <strong>${hr}</strong></div>
-        </div>
-
-        <div style="margin-top:8px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
-          ${canAct ? approvalButtons(trip.id, myStep, myState) : ''}
-          <button class="btn" data-details="${trip.id}">Toon details</button>
-        </div>
-      </div>`;
-      reviewsList.insertAdjacentHTML('beforeend', html);
-    });
-  }, (err)=> alert('Reviews: '+err.code+' — '+err.message));
+    renderReviews(); // eerste render
+  }, (err)=> alert('Reviews: '+(err.code||err.message)));
 }
 
-// 4) Click-handler
+function fillDepartments(trips){
+  if (!revDept || revDept.options.length>1) return;
+  const set = new Set(trips.map(t=>t.department).filter(Boolean));
+  [...set].sort().forEach(dep=>{
+    const op=document.createElement('option'); op.value=dep; op.textContent=dep; revDept.appendChild(op);
+  });
+}
+
+// ===== Filtering & rendering =====
+function passesFilters(t){
+  // status
+  const s = (revStatus.value||'').toLowerCase();
+  if (s && (t.status||'').toLowerCase()!==s) return false;
+  // dept
+  const dep = revDept.value || '';
+  if (dep && (t.department||'')!==dep) return false;
+  // qtr
+  const q = revQtr.value || '';
+  if (q && (t.qtr||'')!==q) return false;
+  // search
+  const qtxt = (revSearch.value||'').trim().toLowerCase();
+  if (qtxt){
+    const hay = [
+      t.title, t.department, t.officeCountry, t.city, t.qtr, t.type,
+      t.combiCode, t.partnerOrg, t.transport
+    ].map(x=>(x||'').toString().toLowerCase()).join(' • ');
+    if(!hay.includes(qtxt)) return false;
+  }
+  return true;
+}
+
+function renderReviews(){
+  const myRole = (window.currentUserDoc?.role)||'traveler';
+  const myStep = actorStepFromRole(myRole);
+
+  const list = _allTrips
+    .filter(({trip})=> passesFilters(trip))
+    // Standaard sorteer op startDate oplopend
+    .sort((a,b)=> (a.trip.startDate||'').localeCompare(b.trip.startDate||''));
+
+  if (!list.length){
+    reviewsList.innerHTML = '<div class="muted">Geen reizen in deze selectie.</div>';
+    return;
+  }
+
+  reviewsList.innerHTML = '';
+  list.forEach(({trip, ap})=>{
+    const mgr = ap.manager?.decision || 'pending';
+    const cd  = ap.cd?.decision      || 'pending';
+    const hr  = ap.hr?.decision      || 'pending';
+
+    // gating: wie mag actie?
+    const gateOK =
+      (myStep==='manager') ||
+      (myStep==='cd' && mgr==='approved') ||
+      (myStep==='hr' && mgr==='approved' && cd==='approved');
+    const myState = myStep ? (ap[myStep]?.decision || 'pending') : null;
+    const canAct  = !!(myStep && gateOK && myState==='pending');
+
+    // labels/waarden
+    const budget = (trip.budgetEffectiveTotal ?? trip.budgetDefaultTotal ?? 0);
+    const co2    = (trip.co2EffectiveTotalTon ?? trip.co2TotalTon ?? 0);
+
+    // notities
+    const notes = [
+      ap.manager?.note ? `Manager: ${safeText(ap.manager.note)}` : '',
+      ap.cd?.note      ? `CD: ${safeText(ap.cd.note)}` : '',
+      ap.hr?.note      ? `HR: ${safeText(ap.hr.note)}` : ''
+    ].filter(Boolean);
+
+    const detailsHTML = `
+      ${kv('Titel', safeText(trip.title||'(zonder titel)'))}
+      ${kv('Status', statusPillX(trip.status))}
+      ${kv('Afdeling', safeText(trip.department||''))}
+      ${kv('Country Office', safeText(trip.officeCountry||''))}
+      ${kv('Plaats', safeText(trip.city||''))}
+      ${kv('Periode', `${fmtDateX(trip.startDate)} – ${fmtDateX(trip.endDate)}`)}
+      ${kv('Qtr', safeText(trip.qtr||''))}
+      ${kv('Dagen', trip.durationDays ?? '')}
+      ${kv('Type', safeText(trip.type||''))}
+      ${kv('Externe partner (bedrijf/organisatie)', safeText(trip.partnerOrg||''))}
+      ${kv('Vervoer', safeText(trip.transport||''))}
+      ${kv('IO Budget', boolLabel(!!trip.ioBudget))}
+      ${kv('CombiCode', safeText(trip.combiCode||''))}
+      ${kv('Budget (Default/Effectief)', `${fmtEURX(trip.budgetDefaultTotal||0)} / ${fmtEURX(budget)}`)}
+      ${kv('CO₂ (t) (Effectief)', (co2||0).toFixed(2))}
+      ${kv('Reiziger UID', safeText(trip.travelerUid||''))}
+      ${kv('Doc ID', safeText(trip.id))}
+    `;
+
+    const approvalsHTML = `
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px">
+        <div>Manager: <strong>${mgr}</strong>${ap.manager?.decidedAt?` <span class="muted">(${ap.manager.decidedAt.toDate?.().toLocaleString('nl-NL')||''})</span>`:''}</div>
+        <div>CD: <strong>${cd}</strong>${ap.cd?.decidedAt?` <span class="muted">(${ap.cd.decidedAt.toDate?.().toLocaleString('nl-NL')||''})</span>`:''}</div>
+        <div>HR: <strong>${hr}</strong>${ap.hr?.decidedAt?` <span class="muted">(${ap.hr.decidedAt.toDate?.().toLocaleString('nl-NL')||''})</span>`:''}</div>
+      </div>
+      ${notes.length ? `<div class="muted" style="margin-top:6px;white-space:pre-wrap">${notes.join('\n')}</div>` : ''}
+    `;
+
+    const card = `
+      <div class="card" data-id="${trip.id}">
+        <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div>
+            <strong>${safeText(trip.title||'(zonder titel)')}</strong><br/>
+            <span class="muted">${safeText(trip.department||'')} • ${safeText(trip.officeCountry||'')}${trip.city?(' • '+safeText(trip.city)):''}</span><br/>
+            <span class="muted">${fmtDateX(trip.startDate)} – ${fmtDateX(trip.endDate)} • ${safeText(trip.qtr||'')}</span>
+          </div>
+          <div class="right">
+            <div>${statusPillX(trip.status)}</div>
+            <div class="muted">${fmtEURX(budget)} • ${(co2||0).toFixed(2)} t CO₂</div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr;gap:6px;margin-top:8px">
+          ${detailsHTML}
+        </div>
+
+        ${approvalsHTML}
+
+        <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+          ${approvalButtons(trip.id, myStep, myState||'pending')}
+          <button class="btn" data-details="${trip.id}">Toon details</button>
+        </div>
+      </div>
+    `;
+    reviewsList.insertAdjacentHTML('beforeend', card);
+  });
+}
+
+// ===== Events: filters =====
+[revSearch, revStatus, revDept, revQtr].forEach(el=>{
+  el && el.addEventListener('input', renderReviews);
+  el && el.addEventListener('change', renderReviews);
+});
+revReset?.addEventListener('click', ()=>{
+  revSearch.value=''; revStatus.value='voorgenomen'; revDept.value=''; revQtr.value='';
+  renderReviews();
+});
+
+// ===== Click-handler: details en beslissingen =====
 reviewsList?.addEventListener('click', async (e)=>{
   const b = e.target.closest('button'); if(!b) return;
 
   // details
   if (b.dataset.details){
     const id = b.dataset.details;
-    const s = await getDoc(doc(db,'trips', id));
-    if (s.exists()) openDetails({id, ...s.data()});
+    try{
+      const s = await getDoc(doc(db,'trips', id));
+      if (s.exists()){
+        // ook approvals meesturen naar details
+        const apSnap = await getDocs(collection(db,`trips/${id}/approvals`));
+        const ap={}; apSnap.forEach(x=> ap[x.id]=x.data());
+        openDetailsX({id, ...s.data(), approvals: ap});
+      }
+    }catch(err){ alert('Details: '+(err.code||err.message)); }
     return;
   }
 
+  // approvals
   const act    = b.dataset.act;
   const tripId = b.dataset.trip;
   let step     = b.dataset.step;
-  if (!step) step = actorStepFromRole(currentUserDoc?.role);
+  if (!step) step = actorStepFromRole(window.currentUserDoc?.role);
   if (!step) return; // traveler heeft geen knoppen
 
   const note = act==='alt' ? (prompt("Alternatief/reden:","")||'') : '';
@@ -584,7 +728,7 @@ reviewsList?.addEventListener('click', async (e)=>{
       decidedByName: currentUser.displayName || currentUser.email
     }, { merge:true });
 
-    // auto-definitief na 3x approved
+    // auto-definitief: als alle drie approved
     const aSnap = await getDocs(collection(db,`trips/${tripId}/approvals`));
     const ap = {}; aSnap.forEach(x=> ap[x.id]=x.data());
     if(ap.manager?.decision==='approved' && ap.cd?.decision==='approved' && ap.hr?.decision==='approved'){
@@ -596,44 +740,12 @@ reviewsList?.addEventListener('click', async (e)=>{
   }
 });
 
-// 5) Zorg dat deze loader na login wordt aangeroepen (bij jou gebeurt dat al in onAuthStateChanged):
-// onAuthStateChanged(auth, ()=>{ ... loadReviewQueue(); ... });
+// ===== Start loader =====
+window.loadReviewQueue = loadReviewQueue; // zodat je hem elders na login kunt aanroepen
+if (window.currentUser) loadReviewQueue();
+</script>
+<!-- =================== /TAB: REVIEWS =================== -->
 
-  // ---- CALENDAR (simple list by view) ----
-  const calView=$("#calView"), calQtr=$("#calQtr"), calMonth=$("#calMonth"), calWeek=$("#calWeek"), calendarArea=$("#calendarArea");
-  [calView, calQtr, calMonth, calWeek].forEach(el=> el.addEventListener('change', buildCalendar));
-  function buildCalendar(){
-    if(!currentUser) return;
-    const v = calView.value;
-    calendarArea.innerHTML = '';
-    // V1: we tonen gefilterde lijst (kan later Gantt worden)
-    const qTrips = query(collection(db,'trips'), orderBy('startDate','asc'));
-    onSnapshot(qTrips, (snap)=>{
-      const rows=[]; snap.forEach(d=> rows.push({id:d.id, ...d.data()}));
-      let filtered = rows;
-      if(v==='quarter'){ filtered = rows.filter(r=> r.qtr===calQtr.value); }
-      // month/week filters optioneel (V1 simplificatie)
-      const wrap = document.createElement('div');
-      if(filtered.length===0){ wrap.innerHTML='<div class="muted">Geen reizen in deze weergave.</div>'; }
-      else{
-        const tbl = document.createElement('table');
-        tbl.innerHTML = `<thead><tr><th>Status</th><th>Titel</th><th>Afdeling</th><th>CO</th><th>Periode</th><th>Qtr</th></tr></thead><tbody></tbody>`;
-        const tb = tbl.querySelector('tbody');
-        filtered.forEach(t=>{
-          tb.insertAdjacentHTML('beforeend', `<tr>
-            <td>${statusPill(t.status)}</td>
-            <td>${t.title}</td>
-            <td>${t.department||''}</td>
-            <td>${t.officeCountry||''}</td>
-            <td>${fmtDate(t.startDate)} – ${fmtDate(t.endDate)}</td>
-            <td>${t.qtr||''}</td>
-          </tr>`);
-        });
-        wrap.appendChild(tbl);
-      }
-      calendarArea.innerHTML=''; calendarArea.appendChild(wrap);
-    });
-  }
 
   // ---- DASHBOARD ----
   const kpiTrips=$("#kpiTrips"), kpiBudget=$("#kpiBudget"), kpiCO2=$("#kpiCO2"), dashDeptFilter=$("#dashDeptFilter"), dashTableWrap=$("#dashTableWrap");
