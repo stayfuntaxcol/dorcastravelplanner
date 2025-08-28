@@ -448,104 +448,151 @@
       rows.forEach(t=> tripsTableBody.insertAdjacentHTML('beforeend', rowTrip(t)));
     });
   }
+// BESLISSING (manager / cd / hr, admin -> 'manager')
+async function decide(tripId, step, decision, note='') {
+  try {
+    await setDoc(doc(db,`trips/${tripId}/approvals/${step}`), {
+      step, decision, note,
+      decidedAt: serverTimestamp(),
+      decidedByUid: currentUser.uid,
+      decidedByName: currentUser.displayName || currentUser.email
+    }, { merge:true });
 
-  // ---- REVIEWS (Manager → CD → HR) ----
-
-  const reviewsList = $("#reviewsList");
-  function approvalButtons(tripId, step, currentDecision){
-    const disabled = currentDecision!=='pending' ? 'disabled' : '';
-    return `<div style="display:flex;gap:6px">
-      <button class="btn" data-act="approve" data-trip="${tripId}" data-step="${step}" ${disabled}>Akkoord</button>
-      <button class="btn" data-act="reject" data-trip="${tripId}" data-step="${step}" ${disabled}>Afwijzen</button>
-      <button class="btn" data-act="alt" data-trip="${tripId}" data-step="${step}" ${disabled}>Alternatief</button>
-    </div>`;
+    // auto-definitief als alle 3 approved
+    const aSnap = await getDocs(collection(db,`trips/${tripId}/approvals`));
+    const ap = {}; aSnap.forEach(x=> ap[x.id]=x.data());
+    if (ap.manager?.decision==='approved' && ap.cd?.decision==='approved' && ap.hr?.decision==='approved') {
+      await setDoc(doc(db,'trips',tripId), { status:'definitief' }, { merge:true });
+      alert('Reis is definitief (groen).');
+    }
+  } catch(e) {
+    alert(e.code + ' — ' + e.message);
   }
-  async function loadReviewQueue(){
-    if(!currentUser) return;
-    const role = (currentUserDoc?.role)||'traveler';
-    const step = role==='manager'?'manager': role==='cd'?'cd': role==='hr'?'hr': null;
-    if(!step){ reviewsList.innerHTML = '<div class="muted">Geen reviewrechten voor jouw rol.</div>'; return; }
+}
 
-    // Toon alle trips waar deze stap nog pending is en eerdere stappen (indien bestaan) niet afgewezen
-    const qTrips = query(collection(db,'trips'), where('status','in',['voorgenomen'])); // licht filter; client check
-    onSnapshot(qTrips, async (snap)=>{
-      const entries = [];
-      const promises = [];
-      snap.forEach(d=>{
-        const trip = {id:d.id, ...d.data()};
-        promises.push((async ()=>{
-          // lees approvals
-          const aRef = collection(db, `trips/${trip.id}/approvals`);
-          const aSnap = await getDocs(aRef);
-          const ap = {}; aSnap.forEach(x=> ap[x.id]=x.data());
-          // gating: manager -> cd -> hr
-          const mgr = ap['manager']?.decision||'pending';
-          const cd  = ap['cd']?.decision||'pending';
-          const hr  = ap['hr']?.decision||'pending';
+ // ---- REVIEWS (simpel: iedereen ziet pending; filter + zoeken + sorteren) ----
+const reviewsTableBody = document.querySelector('#reviewsTable tbody');
+const revSearch = document.getElementById('revSearch');
+const revDept   = document.getElementById('revDept');
+const revSort   = document.getElementById('revSort');
 
-          const gateOK = (step==='manager')
-            || (step==='cd' && mgr==='approved')
-            || (step==='hr' && mgr==='approved' && cd==='approved');
-
-          const myState = ap[step]?.decision||'pending';
-          if(gateOK && myState==='pending'){
-            entries.push({trip, ap});
-          }
-        })());
-      });
-      await Promise.all(promises);
-      // render
-      if(entries.length===0){ reviewsList.innerHTML = '<div class="muted">Geen openstaande reviews.</div>'; return; }
-      reviewsList.innerHTML = '';
-      for(const {trip, ap} of entries){
-        const html = `<div class="card">
-          <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
-            <div>
-              <strong>${trip.title}</strong><br/>
-              <span class="muted">${trip.department||''} • ${trip.officeCountry||''}</span><br/>
-              <span class="muted">${fmtDate(trip.startDate)} – ${fmtDate(trip.endDate)} • ${trip.qtr}</span>
-            </div>
-            <div>
-              <div>${statusPill(trip.status)}</div>
-              <div class="muted right">${fmtEUR(trip.budgetDefaultTotal)} • ${(trip.co2TotalTon||0).toFixed(1)} t</div>
-            </div>
-          </div>
-          <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap">
-            <div>Manager: <strong>${ap.manager?.decision||'pending'}</strong></div>
-            <div>CD: <strong>${ap.cd?.decision||'pending'}</strong></div>
-            <div>HR: <strong>${ap.hr?.decision||'pending'}</strong></div>
-          </div>
-          <div style="margin-top:8px">
-            ${approvalButtons(trip.id, (currentUserDoc.role), ap[currentUserDoc.role]?.decision||'pending')}
-          </div>
-        </div>`;
-        reviewsList.insertAdjacentHTML('beforeend', html);
-      }
-    });
-  }
-
-  reviewsList.addEventListener('click', async (e)=>{
-    const b = e.target.closest('button'); if(!b) return;
-    const act = b.dataset.act, tripId = b.dataset.trip, step = b.dataset.step;
-    const note = act==='alt' ? prompt("Alternatief/reden:","") : "";
-    const decision = act==='approve'?'approved': act==='reject'?'rejected':'alt';
-    try{
-      // update this step
-      await setDoc(doc(db,`trips/${tripId}/approvals/${step}`),{
-        decision, note, decidedAt: serverTimestamp(),
-        decidedByUid: currentUser.uid, decidedByName: currentUser.displayName||currentUser.email
-      }, {merge:true});
-
-      // check auto-finalize: all three approved
-      const aSnap = await getDocs(collection(db,`trips/${tripId}/approvals`));
-      const ap = {}; aSnap.forEach(x=> ap[x.id]=x.data());
-      if(ap.manager?.decision==='approved' && ap.cd?.decision==='approved' && ap.hr?.decision==='approved'){
-        await setDoc(doc(db,'trips',tripId), { status:'definitief' }, {merge:true});
-        alert("Reis is definitief (groen).");
-      }
-      loadReviewQueue();
-    }catch(err){ alert(err.message); }
+// vul afdelingen in de dropdown (1x)
+if (revDept && revDept.options.length === 1 && typeof DEPARTMENTS !== 'undefined') {
+  DEPARTMENTS.forEach(d => {
+    const op = document.createElement('option');
+    op.value = d; op.textContent = d;
+    revDept.appendChild(op);
   });
+}
+
+let _revData = []; // [{ trip, ap }]
+function renderReviews() {
+  const q = (revSearch.value || '').trim().toLowerCase();
+  let rows = _revData.filter(({trip}) => {
+    if (revDept.value && trip.department !== revDept.value) return false;
+    if (q && !((trip.title||'').toLowerCase().includes(q))) return false;
+    return true;
+  });
+
+  // sorteren
+  if (revSort.value === 'qtr') {
+    const ord = {Q1:1,Q2:2,Q3:3,Q4:4};
+    rows.sort((a,b)=>(ord[a.trip.qtr]||0)-(ord[b.trip.qtr]||0) || (a.trip.startDate||'').localeCompare(b.trip.startDate||''));
+  } else if (revSort.value === 'date-desc') {
+    rows.sort((a,b)=>(b.trip.startDate||'').localeCompare(a.trip.startDate||''));
+  } else {
+    rows.sort((a,b)=>(a.trip.startDate||'').localeCompare(b.trip.startDate||''));
+  }
+
+  // bepaal of gebruiker mag beslissen (alleen knoppen tonen indien stap “aan zet”)
+  const role = (currentUserDoc?.role||'traveler').toLowerCase();
+  const myStep = role==='manager' ? 'manager'
+              : role==='cd'      ? 'cd'
+              : role==='hr'      ? 'hr'
+              : role==='admin'   ? 'manager' // desnoods als manager laten optreden
+              : null;
+
+  reviewsTableBody.innerHTML = '';
+  rows.forEach(({trip, ap}) => {
+    const mgr = ap.manager?.decision || 'pending';
+    const cd  = ap.cd?.decision      || 'pending';
+    const hr  = ap.hr?.decision      || 'pending';
+
+    const gateOK =
+      (myStep==='manager') ||
+      (myStep==='cd' && mgr==='approved') ||
+      (myStep==='hr' && mgr==='approved' && cd==='approved');
+
+    const myState = myStep ? (ap[myStep]?.decision || 'pending') : 'none';
+    const canAct = !!(myStep && gateOK && myState==='pending');
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${statusPill(trip.status)}</td>
+      <td>${trip.title || ''}</td>
+      <td>${trip.department || ''}</td>
+      <td>${trip.officeCountry || ''}${trip.city ? (' • ' + trip.city) : ''}</td>
+      <td>${fmtDate(trip.startDate)} – ${fmtDate(trip.endDate)}</td>
+      <td>${trip.qtr || ''}</td>
+      <td>${trip.durationDays || daysBetween(trip.startDate, trip.endDate) || ''}</td>
+      <td class="right">
+        ${canAct ? `
+          <button class="btn" data-approve="${trip.id}">Akkoord</button>
+          <button class="btn" data-reject="${trip.id}">Afwijzen</button>
+          <button class="btn" data-alt="${trip.id}">Alternatief</button>
+        ` : ``}
+        <button class="btn" data-details="${trip.id}">Toon details</button>
+      </td>`;
+    reviewsTableBody.appendChild(tr);
+  });
+
+  // acties
+  reviewsTableBody.querySelectorAll('[data-details]').forEach(btn=>{
+    btn.addEventListener('click', async e=>{
+      const id = e.currentTarget.getAttribute('data-details');
+      const s = await getDoc(doc(db,'trips', id));
+      if (s.exists()) openDetails({id, ...s.data()});
+    });
+  });
+  reviewsTableBody.querySelectorAll('[data-approve]').forEach(btn=>{
+    btn.addEventListener('click', ()=> decide(btn.dataset.approve, (currentUserDoc?.role||'traveler').toLowerCase()==='admin'?'manager':(currentUserDoc?.role||'').toLowerCase(), 'approved'));
+  });
+  reviewsTableBody.querySelectorAll('[data-reject]').forEach(btn=>{
+    btn.addEventListener('click', ()=> decide(btn.dataset.reject, (currentUserDoc?.role||'traveler').toLowerCase()==='admin'?'manager':(currentUserDoc?.role||'').toLowerCase(), 'rejected'));
+  });
+  reviewsTableBody.querySelectorAll('[data-alt]').forEach(btn=>{
+    btn.addEventListener('click', ()=> {
+      const note = prompt('Alternatief/reden:', '');
+      decide(btn.dataset.alt, (currentUserDoc?.role||'traveler').toLowerCase()==='admin'?'manager':(currentUserDoc?.role||'').toLowerCase(), 'alt', note||'');
+    });
+  });
+}
+
+function loadReviewQueue(){
+  if(!currentUser) return;
+  const qTrips = query(collection(db,'trips'), where('status','==','voorgenomen'), orderBy('startDate','asc'));
+  onSnapshot(qTrips, async (snap)=>{
+    const list = [];
+    const jobs = [];
+    snap.forEach(d=>{
+      const trip = {id:d.id, ...d.data()};
+      jobs.push((async ()=>{
+        // lees approvals zodat we knoppen kunnen (de)activeren
+        const aSnap = await getDocs(collection(db, `trips/${trip.id}/approvals`));
+        const ap = {}; aSnap.forEach(x=> ap[x.id]=x.data());
+        list.push({trip, ap});
+      })());
+    });
+    await Promise.all(jobs);
+    _revData = list;
+    renderReviews();
+  });
+}
+
+// filter-events
+revSearch.addEventListener('input', renderReviews);
+revDept.addEventListener('change', renderReviews);
+revSort.addEventListener('change', renderReviews);
 
   // ---- CALENDAR (simple list by view) ----
   const calView=$("#calView"), calQtr=$("#calQtr"), calMonth=$("#calMonth"), calWeek=$("#calWeek"), calendarArea=$("#calendarArea");
