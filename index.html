@@ -590,6 +590,42 @@ reviewsList.addEventListener('click', async (e)=>{
   }
 });
 
+  // ---- CALENDAR (simple list by view) ----
+  const calView=$("#calView"), calQtr=$("#calQtr"), calMonth=$("#calMonth"), calWeek=$("#calWeek"), calendarArea=$("#calendarArea");
+  [calView, calQtr, calMonth, calWeek].forEach(el=> el.addEventListener('change', buildCalendar));
+  function buildCalendar(){
+    if(!currentUser) return;
+    const v = calView.value;
+    calendarArea.innerHTML = '';
+    // V1: we tonen gefilterde lijst (kan later Gantt worden)
+    const qTrips = query(collection(db,'trips'), orderBy('startDate','asc'));
+    onSnapshot(qTrips, (snap)=>{
+      const rows=[]; snap.forEach(d=> rows.push({id:d.id, ...d.data()}));
+      let filtered = rows;
+      if(v==='quarter'){ filtered = rows.filter(r=> r.qtr===calQtr.value); }
+      // month/week filters optioneel (V1 simplificatie)
+      const wrap = document.createElement('div');
+      if(filtered.length===0){ wrap.innerHTML='<div class="muted">Geen reizen in deze weergave.</div>'; }
+      else{
+        const tbl = document.createElement('table');
+        tbl.innerHTML = `<thead><tr><th>Status</th><th>Titel</th><th>Afdeling</th><th>CO</th><th>Periode</th><th>Qtr</th></tr></thead><tbody></tbody>`;
+        const tb = tbl.querySelector('tbody');
+        filtered.forEach(t=>{
+          tb.insertAdjacentHTML('beforeend', `<tr>
+            <td>${statusPill(t.status)}</td>
+            <td>${t.title}</td>
+            <td>${t.department||''}</td>
+            <td>${t.officeCountry||''}</td>
+            <td>${fmtDate(t.startDate)} – ${fmtDate(t.endDate)}</td>
+            <td>${t.qtr||''}</td>
+          </tr>`);
+        });
+        wrap.appendChild(tbl);
+      }
+      calendarArea.innerHTML=''; calendarArea.appendChild(wrap);
+    });
+  }
+
   // ---- DASHBOARD ----
   const kpiTrips=$("#kpiTrips"), kpiBudget=$("#kpiBudget"), kpiCO2=$("#kpiCO2"), dashDeptFilter=$("#dashDeptFilter"), dashTableWrap=$("#dashTableWrap");
   dashDeptFilter.addEventListener('input', loadDashboard);
