@@ -5,23 +5,6 @@
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Dorcas Year Planner — V1</title>
   <style>
-/* Kalender timeline */
-.timeline { border:1px solid var(--line); border-radius:12px; background:#fff; overflow:hidden; }
-.timeline .head { display:grid; grid-template-columns: repeat(12, 1fr); border-bottom:1px solid var(--line); font-size:12px; color:var(--muted); }
-.timeline .head div { padding:6px 8px; text-align:center; }
-.timeline .rows { position:relative; }
-.timeline .row { display:grid; grid-template-columns: 160px 1fr; border-top:1px solid var(--line); }
-.timeline .row > div { padding:6px 8px; }
-.timeline .label { font-size:12px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.timeline .grid { position:relative; height:28px; display:grid; grid-template-columns: repeat(12, 1fr); }
-.timeline .grid div { border-left:1px dashed #eee; }
-.bar { position:absolute; height:18px; top:5px; border-radius:9px; border:1px solid var(--line); }
-.bar.orange { background:#fff7ed; border-color:#fed7aa; }
-.bar.green  { background:#ecfdf5; border-color:#bbf7d0; }
-.bar.red    { background:#fff1f2; border-color:#fecdd3; }
-.kpi-chips { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-.kpi-chips .chip { border:1px solid var(--line); background:#fff; border-radius:999px; padding:4px 10px; font-size:12px; }
-
     :root{
       --green:#1f9d55; --orange:#ff8c00; --red:#c53030; --ink:#1f2937; --bg:#f7fafc; --muted:#718096; --line:#e2e8f0;
     }
@@ -616,107 +599,34 @@ reviewsList?.addEventListener('click', async (e)=>{
 // 5) Zorg dat deze loader na login wordt aangeroepen (bij jou gebeurt dat al in onAuthStateChanged):
 // onAuthStateChanged(auth, ()=>{ ... loadReviewQueue(); ... });
 
-  // ---- CALENDAR (simple list by view) ----
-  const calView=$("#calView"), calQtr=$("#calQtr"), calMonth=$("#calMonth"), calWeek=$("#calWeek"), calendarArea=$("#calendarArea");
-  [calView, calQtr, calMonth, calWeek].forEach(el=> el.addEventListener('change', buildCalendar));
-  function buildCalendar(){
-    if(!currentUser) return;
-    const v = calView.value;
-    calendarArea.innerHTML = '';
-    // V1: we tonen gefilterde lijst (kan later Gantt worden)
-    const qTrips = query(collection(db,'trips'), orderBy('startDate','asc'));
-    onSnapshot(qTrips, (snap)=>{
-      const rows=[]; snap.forEach(d=> rows.push({id:d.id, ...d.data()}));
-      let filtered = rows;
-      if(v==='quarter'){ filtered = rows.filter(r=> r.qtr===calQtr.value); }
-      // month/week filters optioneel (V1 simplificatie)
-      const wrap = document.createElement('div');
-      if(filtered.length===0){ wrap.innerHTML='<div class="muted">Geen reizen in deze weergave.</div>'; }
-      else{
-        const tbl = document.createElement('table');
-        tbl.innerHTML = `<thead><tr><th>Status</th><th>Titel</th><th>Afdeling</th><th>CO</th><th>Periode</th><th>Qtr</th></tr></thead><tbody></tbody>`;
-        const tb = tbl.querySelector('tbody');
-        filtered.forEach(t=>{
-          tb.insertAdjacentHTML('beforeend', `<tr>
-            <td>${statusPill(t.status)}</td>
-            <td>${t.title}</td>
-            <td>${t.department||''}</td>
-            <td>${t.officeCountry||''}</td>
-            <td>${fmtDate(t.startDate)} – ${fmtDate(t.endDate)}</td>
-            <td>${t.qtr||''}</td>
-          </tr>`);
-        });
-        wrap.appendChild(tbl);
-      }
-      calendarArea.innerHTML=''; calendarArea.appendChild(wrap);
-    });
-  }
-
- // ---- DASHBOARD ----
-  const kpiTrips=$("#kpiTrips"), kpiBudget=$("#kpiBudget"), kpiCO2=$("#kpiCO2"), dashDeptFilter=$("#dashDeptFilter"), dashTableWrap=$("#dashTableWrap");
-  dashDeptFilter.addEventListener('input', loadDashboard);
-  function loadDashboard(){
-    if(!currentUser) return;
-    const qAll = query(collection(db,'trips'));
-    onSnapshot(qAll, (snap)=>{
-      const rows=[]; snap.forEach(d=> rows.push({id:d.id,...d.data()}));
-      const dept = dashDeptFilter.value.trim().toLowerCase();
-      const filtered = dept ? rows.filter(r=>(r.department||'').toLowerCase().includes(dept)) : rows;
-      const n = filtered.length;
-      const sumBudget = filtered.reduce((a,b)=>a+(b.budgetDefaultTotal||0),0);
-      const sumCO2 = filtered.reduce((a,b)=>a+(b.co2TotalTon||0),0);
-      kpiTrips.textContent = n;
-      kpiBudget.textContent = fmtEUR(sumBudget);
-      kpiCO2.textContent = sumCO2.toFixed(1);
-
-      // per afdeling tabel
-      const group = {};
-      filtered.forEach(t=>{
-        const d = t.department||'Onbekend';
-        group[d] = group[d] || {n:0, eur:0, co2:0};
-        group[d].n++; group[d].eur += (t.budgetDefaultTotal||0); group[d].co2 += (t.co2TotalTon||0);
-      });
-      const table = document.createElement('table');
-      table.innerHTML = `<thead><tr><th>Afdeling</th><th class="right">#</th><th class="right">€</th><th class="right">CO₂ (t)</th></tr></thead><tbody></tbody>`;
-      const tb = table.querySelector('tbody');
-      Object.entries(group).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([d,agg])=>{
-        tb.insertAdjacentHTML('beforeend', `<tr>
-          <td>${d}</td><td class="right">${agg.n}</td><td class="right">${fmtEUR(agg.eur)}</td><td class="right">${agg.co2.toFixed(1)}</td>
-        </tr>`);
-      });
-      dashTableWrap.innerHTML=''; dashTableWrap.appendChild(table);
-    });
-  }
-
-  // --- Init view defaults ---
-  // Q4 focus bij start
-  calView.value = 'quarter'; calQtr.value='Q4';
-
-</script>
-<!-- ====== KALENDER UPGRADE (alles-in-1) ====== -->
-<style id="calendar-css-v2">
+<!-- ====== KALENDER (alles-in-1) ====== -->
+<style>
 /* Timeline + chips */
-.timeline { border:1px solid var(--line); border-radius:12px; background:#fff; overflow:hidden; }
-.timeline .head { display:grid; grid-template-columns: repeat(12, 1fr); border-bottom:1px solid var(--line); font-size:12px; color:var(--muted); }
+.timeline { border:1px solid var(--line,#e6e6e6); border-radius:12px; background:#fff; overflow:hidden; }
+.timeline .head { display:grid; grid-template-columns: repeat(12, 1fr); border-bottom:1px solid var(--line,#e6e6e6); font-size:12px; color:var(--muted,#667085); }
 .timeline .head div { padding:6px 8px; text-align:center; }
 .timeline .rows { position:relative; }
-.timeline .row { display:grid; grid-template-columns: 160px 1fr; border-top:1px solid var(--line); }
+.timeline .row { display:grid; grid-template-columns: 200px 1fr; border-top:1px solid var(--line,#e6e6e6); }
 .timeline .row > div { padding:6px 8px; }
-.timeline .label { font-size:12px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.timeline .label { font-size:12px; color:var(--ink,#111); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .timeline .grid { position:relative; height:28px; display:grid; grid-template-columns: repeat(12, 1fr); }
 .timeline .grid div { border-left:1px dashed #eee; }
-.bar { position:absolute; height:18px; top:5px; border-radius:9px; border:1px solid var(--line); }
+.bar { position:absolute; height:18px; top:5px; border-radius:9px; border:1px solid var(--line,#e6e6e6); }
 .bar.orange { background:#fff7ed; border-color:#fed7aa; }
 .bar.green  { background:#ecfdf5; border-color:#bbf7d0; }
 .bar.red    { background:#fff1f2; border-color:#fecdd3; }
-.kpi-chips { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
-.kpi-chips .chip { border:1px solid var(--line); background:#fff; border-radius:999px; padding:4px 10px; font-size:12px; }
+.kpi-chips { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px; }
+.kpi-chips .chip { border:1px solid var(--line,#e6e6e6); background:#fff; border-radius:999px; padding:4px 10px; font-size:12px; }
+.status-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align:middle; }
+.dot-orange { background:#fb923c; }
+.dot-green  { background:#22c55e; }
+.dot-red    { background:#ef4444; }
 </style>
 
 <section id="tab-calendar" class="tab card hidden">
   <h3>Kalender</h3>
 
-  <div class="toolbar" style="margin-bottom:8px">
+  <div class="toolbar" style="margin-bottom:8px; display:flex; gap:8px; flex-wrap:wrap;">
     <select id="calStatus">
       <option value="">Status: alles</option>
       <option value="voorgenomen">Voorgenomen</option>
@@ -740,7 +650,7 @@ reviewsList?.addEventListener('click', async (e)=>{
     <button id="calOnlyApproved" class="btn">Alleen definitief</button>
   </div>
 
-  <div class="kpi-chips" style="margin-bottom:8px">
+  <div class="kpi-chips">
     <span class="chip"><span class="status-dot dot-orange"></span> Voorgenomen: <b id="calCountPending">0</b></span>
     <span class="chip"><span class="status-dot dot-green"></span> Definitief: <b id="calCountApproved">0</b></span>
     <span class="chip"><span class="status-dot dot-red"></span> Afgewezen: <b id="calCountRejected">0</b></span>
@@ -762,22 +672,27 @@ reviewsList?.addEventListener('click', async (e)=>{
 </section>
 
 <script type="module">
-/* Verwacht dat je al Firebase hebt geïnitialiseerd en dat deze helpers globaal bestaan:
-   db, getDoc, doc, onSnapshot, query, collection (uit firebase/firestore)
-   fmtDate, daysBetween, statusPill, openDetails
-   DEPARTMENTS, OFFICES
-   De snippet heeft fallbacks zodat het niet crasht. */
+// === Imports (veilig om nogmaals te importeren) ===
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+import { getFirestore, collection, query, onSnapshot, doc, getDoc, getDocs } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
-const fmtDateX = window.fmtDate || (s => s ? new Date(s).toLocaleDateString('nl-NL') : '');
-const daysBetweenX = window.daysBetween || ((a,b)=> Math.floor((new Date(b)-new Date(a))/(1000*60*60*24))+1);
-const statusPillX = window.statusPill || (s=>{
-  const m = (s||'').toLowerCase();
-  if (m==='definitief') return '<span class="pill green"><span class="status-dot dot-green"></span>definitief</span>';
-  if (m==='afgewezen')  return '<span class="pill red"><span class="status-dot dot-red"></span>afgewezen</span>';
+// === Fallback helpers (gebruikt jouw globale helpers als ze bestaan) ===
+const fmtDate = window.fmtDate || (s => s ? new Date(s).toLocaleDateString('nl-NL') : '');
+const daysBetween = window.daysBetween || ((a,b)=> Math.floor((new Date(b)-new Date(a))/(1000*60*60*24))+1);
+const statusPill = window.statusPill || (s=>{
+  const m=(s||'').toLowerCase();
+  if(m==='definitief') return '<span class="pill green"><span class="status-dot dot-green"></span>definitief</span>';
+  if(m==='afgewezen')  return '<span class="pill red"><span class="status-dot dot-red"></span>afgewezen</span>';
   return '<span class="pill orange"><span class="status-dot dot-orange"></span>voorgenomen</span>';
 });
-const openDetailsX = window.openDetails || (t=> alert(JSON.stringify(t,null,2)));
+const openDetails = window.openDetails || (t=> alert(JSON.stringify(t,null,2)));
 
+// === DB/Auth (gebruik globale db indien aanwezig) ===
+const auth = getAuth();
+const _db = (typeof window.db !== 'undefined') ? window.db : getFirestore();
+
+// === DOM refs ===
+const calTab = document.getElementById('tab-calendar');
 const calStatus = document.getElementById('calStatus');
 const calDept   = document.getElementById('calDept');
 const calOffice = document.getElementById('calOffice');
@@ -794,17 +709,33 @@ const calCountPending  = document.getElementById('calCountPending');
 const calCountApproved = document.getElementById('calCountApproved');
 const calCountRejected = document.getElementById('calCountRejected');
 
-// Vul filters (eenmalig)
-if (window.DEPARTMENTS && calDept && calDept.options.length === 1) {
-  window.DEPARTMENTS.forEach(d => { const op=document.createElement('option'); op.value=d; op.textContent=d; calDept.appendChild(op); });
-}
-if (window.OFFICES && calOffice && calOffice.options.length === 1) {
-  window.OFFICES.forEach(o => { const op=document.createElement('option'); op.value=o; op.textContent=o; calOffice.appendChild(op); });
+// === Filters vullen (uit globale arrays of Firestore) ===
+async function populateFilters(){
+  // DEP
+  if (calDept && calDept.options.length === 1){
+    if (Array.isArray(window.DEPARTMENTS)) {
+      window.DEPARTMENTS.forEach(d=>{ const op=document.createElement('option'); op.value=d; op.textContent=d; calDept.appendChild(op); });
+    } else {
+      try {
+        const snap = await getDocs(collection(_db,'departments'));
+        snap.forEach(d=>{ const op=document.createElement('option'); op.value=d.id; op.textContent=d.id; calDept.appendChild(op); });
+      } catch(_) {}
+    }
+  }
+  // OFFICES
+  if (calOffice && calOffice.options.length === 1){
+    if (Array.isArray(window.OFFICES)) {
+      window.OFFICES.forEach(o=>{ const op=document.createElement('option'); op.value=o; op.textContent=o; calOffice.appendChild(op); });
+    } else {
+      try {
+        const snap = await getDocs(collection(_db,'offices'));
+        snap.forEach(d=>{ const op=document.createElement('option'); op.value=d.id; op.textContent=d.id; calOffice.appendChild(op); });
+      } catch(_) {}
+    }
+  }
 }
 
-let _calData = [];
-let _calUnsub = null;
-
+// === Utils ===
 function ymd(date){
   const d=new Date(date), y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0');
   return `${y}-${m}-${dd}`;
@@ -836,6 +767,11 @@ function barLeftWidthWithinYear(startStr, endStr, year){
   return [left, width];
 }
 
+// === Data/state ===
+let _calData = [];
+let _calUnsub = null;
+
+// === Filteren & renderen ===
 function filterRows(){
   ensureDefaultYearRange();
   const s = (calStatus.value||'').toLowerCase();
@@ -877,13 +813,13 @@ function renderTimeline(rows){
   const months = ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
 
   let html = `<div class="head">${months.map(m=>`<div>${m}</div>`).join('')}</div><div class="rows">`;
-  const show = rows.slice(0, 30); // compact
+  const show = rows.slice(0, 40); // cap 40 rijen
   show.forEach(t=>{
     const color = (t.status==='definitief') ? 'green' : (t.status==='afgewezen') ? 'red' : 'orange';
     const [left,width] = barLeftWidthWithinYear(t.startDate, t.endDate, y);
     const label = `${t.department||''} • ${t.officeCountry||''}${t.city?(' • '+t.city):''}`;
     html += `<div class="row">
-      <div class="label">${label}</div>
+      <div class="label" title="${(t.title||'').replace(/"/g,'&quot;')}">${label}</div>
       <div class="grid">${'<div></div>'.repeat(12)}
         <div class="bar ${color}" style="left:${left}%; width:${width}%;" title="${(t.title||'').replace(/"/g,'&quot;')} (${t.qtr||''})"></div>
       </div>
@@ -901,22 +837,23 @@ function renderCalendarTable(rows){
   }
   rows.forEach(t=>{
     const html = `<tr>
-      <td>${statusPillX(t.status)}</td>
+      <td>${statusPill(t.status)}</td>
       <td>${t.department||''}</td>
       <td>${t.officeCountry||''}${t.city?(' • '+t.city):''}</td>
-      <td>${fmtDateX(t.startDate)} – ${fmtDateX(t.endDate)}</td>
+      <td>${fmtDate(t.startDate)} – ${fmtDate(t.endDate)}</td>
       <td>${t.qtr||''}</td>
-      <td>${t.durationDays || (t.startDate&&t.endDate? daysBetweenX(t.startDate,t.endDate): '')}</td>
+      <td>${t.durationDays || (t.startDate&&t.endDate? daysBetween(t.startDate,t.endDate): '')}</td>
       <td class="right"><button class="btn" data-cal-details="${t.id}">Toon details</button></td>
     </tr>`;
     calTBody.insertAdjacentHTML('beforeend', html);
   });
+  // details
   calTBody.querySelectorAll('[data-cal-details]').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       const id = btn.getAttribute('data-cal-details');
       try {
-        const s = await getDoc(doc(db,'trips', id));
-        if (s.exists()) openDetailsX({id, ...s.data()});
+        const s = await getDoc(doc(_db,'trips', id));
+        if (s.exists()) openDetails({id, ...s.data()});
       } catch(e) { alert('Details: '+(e.code||e.message)); }
     });
   });
@@ -924,26 +861,32 @@ function renderCalendarTable(rows){
 
 function renderCalendar(){
   const rows = filterRows();
-  renderCounts(_calData);    // counters tonen over ALLE data
-  renderTimeline(rows);      // timeline over gefilterde data
-  renderCalendarTable(rows); // tabel over gefilterde data
+  renderCounts(_calData);    // counters op alle data
+  renderTimeline(rows);      // timeline op gefilterde data
+  renderCalendarTable(rows); // tabel op gefilterde data
 }
 
-function buildCalendar(){
-  if (_calUnsub) { renderCalendar(); return; }
+// === Listener opbouwen ===
+async function buildCalendar(){
+  await populateFilters();
   ensureDefaultYearRange();
+  if (_calUnsub) { renderCalendar(); return; }
   try {
-    _calUnsub = onSnapshot(query(collection(db,'trips')), (snap)=>{
+    _calUnsub = onSnapshot(query(collection(_db,'trips')), (snap)=>{
       const rows=[]; snap.forEach(d=> rows.push({id:d.id, ...d.data()}));
       _calData = rows;
       renderCalendar();
-    }, (err)=> alert('Kalender: '+err.code+' — '+err.message));
+    }, (err)=> {
+      console.error('[Kalender] onSnapshot error:', err);
+      calTimeline.innerHTML = `<div style="padding:8px;color:#b00">Kalender fout: ${err.code||err.message}</div>`;
+    });
   } catch(e) {
-    console.warn('Kalender init:', e);
+    console.error('[Kalender] init error:', e);
+    calTimeline.innerHTML = `<div style="padding:8px;color:#b00">Init fout: ${e.message}</div>`;
   }
 }
 
-// events
+// === Events ===
 [calStatus, calDept, calOffice, calQtr, calFrom, calTo].forEach(el=>{
   el && el.addEventListener('change', renderCalendar);
 });
@@ -971,11 +914,54 @@ calOnlyApproved && calOnlyApproved.addEventListener('click', ()=>{
   renderCalendar();
 });
 
-// start (als je al ingelogd bent, anders wordt hij later nog eens aangeroepen in onAuthStateChanged)
-buildCalendar();
+// === Start na login ===
+onAuthStateChanged(auth, (u)=>{
+  if(u){ buildCalendar(); }
+});
+if (auth.currentUser) { buildCalendar(); } // fallback als al ingelogd
 </script>
-<!-- ====== EINDE KALENDER UPGRADE ====== -->
+<!-- ====== EINDE KALENDER ====== -->
+ // ---- DASHBOARD ----
+  const kpiTrips=$("#kpiTrips"), kpiBudget=$("#kpiBudget"), kpiCO2=$("#kpiCO2"), dashDeptFilter=$("#dashDeptFilter"), dashTableWrap=$("#dashTableWrap");
+  dashDeptFilter.addEventListener('input', loadDashboard);
+  function loadDashboard(){
+    if(!currentUser) return;
+    const qAll = query(collection(db,'trips'));
+    onSnapshot(qAll, (snap)=>{
+      const rows=[]; snap.forEach(d=> rows.push({id:d.id,...d.data()}));
+      const dept = dashDeptFilter.value.trim().toLowerCase();
+      const filtered = dept ? rows.filter(r=>(r.department||'').toLowerCase().includes(dept)) : rows;
+      const n = filtered.length;
+      const sumBudget = filtered.reduce((a,b)=>a+(b.budgetDefaultTotal||0),0);
+      const sumCO2 = filtered.reduce((a,b)=>a+(b.co2TotalTon||0),0);
+      kpiTrips.textContent = n;
+      kpiBudget.textContent = fmtEUR(sumBudget);
+      kpiCO2.textContent = sumCO2.toFixed(1);
 
+      // per afdeling tabel
+      const group = {};
+      filtered.forEach(t=>{
+        const d = t.department||'Onbekend';
+        group[d] = group[d] || {n:0, eur:0, co2:0};
+        group[d].n++; group[d].eur += (t.budgetDefaultTotal||0); group[d].co2 += (t.co2TotalTon||0);
+      });
+      const table = document.createElement('table');
+      table.innerHTML = `<thead><tr><th>Afdeling</th><th class="right">#</th><th class="right">€</th><th class="right">CO₂ (t)</th></tr></thead><tbody></tbody>`;
+      const tb = table.querySelector('tbody');
+      Object.entries(group).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([d,agg])=>{
+        tb.insertAdjacentHTML('beforeend', `<tr>
+          <td>${d}</td><td class="right">${agg.n}</td><td class="right">${fmtEUR(agg.eur)}</td><td class="right">${agg.co2.toFixed(1)}</td>
+        </tr>`);
+      });
+      dashTableWrap.innerHTML=''; dashTableWrap.appendChild(table);
+    });
+  }
+
+  // --- Init view defaults ---
+  // Q4 focus bij start
+  calView.value = 'quarter'; calQtr.value='Q4';
+
+</script>
   
 </body>
 </html>
