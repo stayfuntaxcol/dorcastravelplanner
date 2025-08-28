@@ -5,6 +5,23 @@
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Dorcas Year Planner — V1</title>
   <style>
+/* Kalender timeline */
+.timeline { border:1px solid var(--line); border-radius:12px; background:#fff; overflow:hidden; }
+.timeline .head { display:grid; grid-template-columns: repeat(12, 1fr); border-bottom:1px solid var(--line); font-size:12px; color:var(--muted); }
+.timeline .head div { padding:6px 8px; text-align:center; }
+.timeline .rows { position:relative; }
+.timeline .row { display:grid; grid-template-columns: 160px 1fr; border-top:1px solid var(--line); }
+.timeline .row > div { padding:6px 8px; }
+.timeline .label { font-size:12px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.timeline .grid { position:relative; height:28px; display:grid; grid-template-columns: repeat(12, 1fr); }
+.timeline .grid div { border-left:1px dashed #eee; }
+.bar { position:absolute; height:18px; top:5px; border-radius:9px; border:1px solid var(--line); }
+.bar.orange { background:#fff7ed; border-color:#fed7aa; }
+.bar.green  { background:#ecfdf5; border-color:#bbf7d0; }
+.bar.red    { background:#fff1f2; border-color:#fecdd3; }
+.kpi-chips { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.kpi-chips .chip { border:1px solid var(--line); background:#fff; border-radius:999px; padding:4px 10px; font-size:12px; }
+
     :root{
       --green:#1f9d55; --orange:#ff8c00; --red:#c53030; --ink:#1f2937; --bg:#f7fafc; --muted:#718096; --line:#e2e8f0;
     }
@@ -635,7 +652,7 @@ reviewsList?.addEventListener('click', async (e)=>{
     });
   }
 
-  // ---- DASHBOARD ----
+ // ---- DASHBOARD ----
   const kpiTrips=$("#kpiTrips"), kpiBudget=$("#kpiBudget"), kpiCO2=$("#kpiCO2"), dashDeptFilter=$("#dashDeptFilter"), dashTableWrap=$("#dashTableWrap");
   dashDeptFilter.addEventListener('input', loadDashboard);
   function loadDashboard(){
@@ -676,5 +693,289 @@ reviewsList?.addEventListener('click', async (e)=>{
   calView.value = 'quarter'; calQtr.value='Q4';
 
 </script>
+<!-- ====== KALENDER UPGRADE (alles-in-1) ====== -->
+<style id="calendar-css-v2">
+/* Timeline + chips */
+.timeline { border:1px solid var(--line); border-radius:12px; background:#fff; overflow:hidden; }
+.timeline .head { display:grid; grid-template-columns: repeat(12, 1fr); border-bottom:1px solid var(--line); font-size:12px; color:var(--muted); }
+.timeline .head div { padding:6px 8px; text-align:center; }
+.timeline .rows { position:relative; }
+.timeline .row { display:grid; grid-template-columns: 160px 1fr; border-top:1px solid var(--line); }
+.timeline .row > div { padding:6px 8px; }
+.timeline .label { font-size:12px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.timeline .grid { position:relative; height:28px; display:grid; grid-template-columns: repeat(12, 1fr); }
+.timeline .grid div { border-left:1px dashed #eee; }
+.bar { position:absolute; height:18px; top:5px; border-radius:9px; border:1px solid var(--line); }
+.bar.orange { background:#fff7ed; border-color:#fed7aa; }
+.bar.green  { background:#ecfdf5; border-color:#bbf7d0; }
+.bar.red    { background:#fff1f2; border-color:#fecdd3; }
+.kpi-chips { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.kpi-chips .chip { border:1px solid var(--line); background:#fff; border-radius:999px; padding:4px 10px; font-size:12px; }
+</style>
+
+<section id="tab-calendar" class="tab card hidden">
+  <h3>Kalender</h3>
+
+  <div class="toolbar" style="margin-bottom:8px">
+    <select id="calStatus">
+      <option value="">Status: alles</option>
+      <option value="voorgenomen">Voorgenomen</option>
+      <option value="definitief">Definitief</option>
+      <option value="afgewezen">Afgewezen</option>
+    </select>
+
+    <select id="calDept"><option value="">Afdeling: alles</option></select>
+    <select id="calOffice"><option value="">CO: alles</option></select>
+
+    <select id="calQtr">
+      <option value="">Qtr: alles</option>
+      <option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option>
+    </select>
+
+    <input id="calFrom" type="date" />
+    <input id="calTo"   type="date" />
+    <input id="calWeek" type="week" />
+    <button id="calToday" class="btn">Vandaag</button>
+    <button id="calReset" class="btn">Reset</button>
+    <button id="calOnlyApproved" class="btn">Alleen definitief</button>
+  </div>
+
+  <div class="kpi-chips" style="margin-bottom:8px">
+    <span class="chip"><span class="status-dot dot-orange"></span> Voorgenomen: <b id="calCountPending">0</b></span>
+    <span class="chip"><span class="status-dot dot-green"></span> Definitief: <b id="calCountApproved">0</b></span>
+    <span class="chip"><span class="status-dot dot-red"></span> Afgewezen: <b id="calCountRejected">0</b></span>
+  </div>
+
+  <div id="calendarTimeline" class="timeline" style="margin-bottom:8px"></div>
+
+  <div class="card" style="padding:0;overflow:auto">
+    <table id="calTable">
+      <thead>
+        <tr>
+          <th>Status</th><th>Afdeling</th><th>CO</th>
+          <th>Periode</th><th>Qtr</th><th>Dagen</th><th></th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</section>
+
+<script type="module">
+/* Verwacht dat je al Firebase hebt geïnitialiseerd en dat deze helpers globaal bestaan:
+   db, getDoc, doc, onSnapshot, query, collection (uit firebase/firestore)
+   fmtDate, daysBetween, statusPill, openDetails
+   DEPARTMENTS, OFFICES
+   De snippet heeft fallbacks zodat het niet crasht. */
+
+const fmtDateX = window.fmtDate || (s => s ? new Date(s).toLocaleDateString('nl-NL') : '');
+const daysBetweenX = window.daysBetween || ((a,b)=> Math.floor((new Date(b)-new Date(a))/(1000*60*60*24))+1);
+const statusPillX = window.statusPill || (s=>{
+  const m = (s||'').toLowerCase();
+  if (m==='definitief') return '<span class="pill green"><span class="status-dot dot-green"></span>definitief</span>';
+  if (m==='afgewezen')  return '<span class="pill red"><span class="status-dot dot-red"></span>afgewezen</span>';
+  return '<span class="pill orange"><span class="status-dot dot-orange"></span>voorgenomen</span>';
+});
+const openDetailsX = window.openDetails || (t=> alert(JSON.stringify(t,null,2)));
+
+const calStatus = document.getElementById('calStatus');
+const calDept   = document.getElementById('calDept');
+const calOffice = document.getElementById('calOffice');
+const calQtr    = document.getElementById('calQtr');
+const calFrom   = document.getElementById('calFrom');
+const calTo     = document.getElementById('calTo');
+const calWeek   = document.getElementById('calWeek');
+const calToday  = document.getElementById('calToday');
+const calReset  = document.getElementById('calReset');
+const calOnlyApproved = document.getElementById('calOnlyApproved');
+const calTBody  = document.querySelector('#calTable tbody');
+const calTimeline = document.getElementById('calendarTimeline');
+const calCountPending  = document.getElementById('calCountPending');
+const calCountApproved = document.getElementById('calCountApproved');
+const calCountRejected = document.getElementById('calCountRejected');
+
+// Vul filters (eenmalig)
+if (window.DEPARTMENTS && calDept && calDept.options.length === 1) {
+  window.DEPARTMENTS.forEach(d => { const op=document.createElement('option'); op.value=d; op.textContent=d; calDept.appendChild(op); });
+}
+if (window.OFFICES && calOffice && calOffice.options.length === 1) {
+  window.OFFICES.forEach(o => { const op=document.createElement('option'); op.value=o; op.textContent=o; calOffice.appendChild(op); });
+}
+
+let _calData = [];
+let _calUnsub = null;
+
+function ymd(date){
+  const d=new Date(date), y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0');
+  return `${y}-${m}-${dd}`;
+}
+function weekRange(iso){
+  if(!iso || !iso.includes('-W')) return [null,null];
+  const [y, wStr] = iso.split('-W'); const w = parseInt(wStr,10), year=parseInt(y,10);
+  const jan4 = new Date(year,0,4), day = jan4.getDay() || 7;
+  const monW1 = new Date(jan4); monW1.setDate(jan4.getDate() - (day-1));
+  const mon = new Date(monW1); mon.setDate(monW1.getDate() + (w-1)*7);
+  const sun = new Date(mon);   sun.setDate(mon.getDate()+6);
+  return [mon,sun];
+}
+function ensureDefaultYearRange(){
+  if (!calFrom.value || !calTo.value) {
+    const now = new Date(); const y = now.getFullYear();
+    calFrom.value = `${y}-01-01`;
+    calTo.value   = `${y}-12-31`;
+  }
+}
+function clampDate(s, min, max){ const d=new Date(s); return d<min? new Date(min) : d>max? new Date(max) : d; }
+function barLeftWidthWithinYear(startStr, endStr, year){
+  const yearStart = new Date(year,0,1), yearEnd=new Date(year,11,31);
+  const s = clampDate(startStr, yearStart, yearEnd);
+  const e = clampDate(endStr,   yearStart, yearEnd);
+  const total = (yearEnd - yearStart) || 1;
+  const left = ((s - yearStart) / total) * 100;
+  const width = Math.max(1, ((e - s) / total) * 100);
+  return [left, width];
+}
+
+function filterRows(){
+  ensureDefaultYearRange();
+  const s = (calStatus.value||'').toLowerCase();
+  const dep = calDept.value || '';
+  const off = calOffice.value || '';
+  const qtr = calQtr.value || '';
+  const from = calFrom.value || '';
+  const to   = calTo.value   || '';
+
+  let rows = _calData.slice();
+  rows = rows.filter(t=>{
+    if (s && (t.status||'').toLowerCase() !== s) return false;
+    if (dep && (t.department||'') !== dep) return false;
+    if (off && (t.officeCountry||'') !== off) return false;
+    if (qtr && (t.qtr||'') !== qtr) return false;
+
+    if (from || to) {
+      const start = t.startDate || '';
+      const end   = t.endDate   || '';
+      if (from && end && end < from) return false;
+      if (to && start && start > to) return false;
+    }
+    return true;
+  });
+  return rows.sort((a,b)=>(a.startDate||'').localeCompare(b.startDate||''));
+}
+
+function renderCounts(allRows){
+  const p = allRows.filter(t=>(t.status||'').toLowerCase()==='voorgenomen').length;
+  const a = allRows.filter(t=>(t.status||'').toLowerCase()==='definitief').length;
+  const r = allRows.filter(t=>(t.status||'').toLowerCase()==='afgewezen').length;
+  calCountPending.textContent = p;
+  calCountApproved.textContent = a;
+  calCountRejected.textContent = r;
+}
+
+function renderTimeline(rows){
+  const y = new Date(calFrom.value || new Date()).getFullYear();
+  const months = ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
+
+  let html = `<div class="head">${months.map(m=>`<div>${m}</div>`).join('')}</div><div class="rows">`;
+  const show = rows.slice(0, 30); // compact
+  show.forEach(t=>{
+    const color = (t.status==='definitief') ? 'green' : (t.status==='afgewezen') ? 'red' : 'orange';
+    const [left,width] = barLeftWidthWithinYear(t.startDate, t.endDate, y);
+    const label = `${t.department||''} • ${t.officeCountry||''}${t.city?(' • '+t.city):''}`;
+    html += `<div class="row">
+      <div class="label">${label}</div>
+      <div class="grid">${'<div></div>'.repeat(12)}
+        <div class="bar ${color}" style="left:${left}%; width:${width}%;" title="${(t.title||'').replace(/"/g,'&quot;')} (${t.qtr||''})"></div>
+      </div>
+    </div>`;
+  });
+  html += `</div>`;
+  calTimeline.innerHTML = html;
+}
+
+function renderCalendarTable(rows){
+  calTBody.innerHTML = '';
+  if (rows.length === 0) {
+    calTBody.innerHTML = '<tr><td colspan="7" class="muted">Geen reizen in selectie.</td></tr>';
+    return;
+  }
+  rows.forEach(t=>{
+    const html = `<tr>
+      <td>${statusPillX(t.status)}</td>
+      <td>${t.department||''}</td>
+      <td>${t.officeCountry||''}${t.city?(' • '+t.city):''}</td>
+      <td>${fmtDateX(t.startDate)} – ${fmtDateX(t.endDate)}</td>
+      <td>${t.qtr||''}</td>
+      <td>${t.durationDays || (t.startDate&&t.endDate? daysBetweenX(t.startDate,t.endDate): '')}</td>
+      <td class="right"><button class="btn" data-cal-details="${t.id}">Toon details</button></td>
+    </tr>`;
+    calTBody.insertAdjacentHTML('beforeend', html);
+  });
+  calTBody.querySelectorAll('[data-cal-details]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const id = btn.getAttribute('data-cal-details');
+      try {
+        const s = await getDoc(doc(db,'trips', id));
+        if (s.exists()) openDetailsX({id, ...s.data()});
+      } catch(e) { alert('Details: '+(e.code||e.message)); }
+    });
+  });
+}
+
+function renderCalendar(){
+  const rows = filterRows();
+  renderCounts(_calData);    // counters tonen over ALLE data
+  renderTimeline(rows);      // timeline over gefilterde data
+  renderCalendarTable(rows); // tabel over gefilterde data
+}
+
+function buildCalendar(){
+  if (_calUnsub) { renderCalendar(); return; }
+  ensureDefaultYearRange();
+  try {
+    _calUnsub = onSnapshot(query(collection(db,'trips')), (snap)=>{
+      const rows=[]; snap.forEach(d=> rows.push({id:d.id, ...d.data()}));
+      _calData = rows;
+      renderCalendar();
+    }, (err)=> alert('Kalender: '+err.code+' — '+err.message));
+  } catch(e) {
+    console.warn('Kalender init:', e);
+  }
+}
+
+// events
+[calStatus, calDept, calOffice, calQtr, calFrom, calTo].forEach(el=>{
+  el && el.addEventListener('change', renderCalendar);
+});
+calWeek && calWeek.addEventListener('change', ()=>{
+  const [mon, sun] = weekRange(calWeek.value);
+  if (mon && sun) {
+    calFrom.value = ymd(mon);
+    calTo.value   = ymd(sun);
+    renderCalendar();
+  }
+});
+calToday && calToday.addEventListener('click', ()=>{
+  const today = new Date();
+  calFrom.value = ymd(today);
+  calTo.value   = ymd(today);
+  renderCalendar();
+});
+calReset && calReset.addEventListener('click', ()=>{
+  calStatus.value=''; calDept.value=''; calOffice.value=''; calQtr.value='';
+  calFrom.value=''; calTo.value=''; calWeek.value='';
+  renderCalendar(); // zet weer jaar-default
+});
+calOnlyApproved && calOnlyApproved.addEventListener('click', ()=>{
+  calStatus.value = 'definitief';
+  renderCalendar();
+});
+
+// start (als je al ingelogd bent, anders wordt hij later nog eens aangeroepen in onAuthStateChanged)
+buildCalendar();
+</script>
+<!-- ====== EINDE KALENDER UPGRADE ====== -->
+
+  
 </body>
 </html>
