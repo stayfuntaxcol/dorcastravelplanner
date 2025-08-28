@@ -599,329 +599,43 @@ reviewsList?.addEventListener('click', async (e)=>{
 // 5) Zorg dat deze loader na login wordt aangeroepen (bij jou gebeurt dat al in onAuthStateChanged):
 // onAuthStateChanged(auth, ()=>{ ... loadReviewQueue(); ... });
 
-<!-- ====== KALENDER (alles-in-1) ====== -->
-<style>
-/* Timeline + chips */
-.timeline { border:1px solid var(--line,#e6e6e6); border-radius:12px; background:#fff; overflow:hidden; }
-.timeline .head { display:grid; grid-template-columns: repeat(12, 1fr); border-bottom:1px solid var(--line,#e6e6e6); font-size:12px; color:var(--muted,#667085); }
-.timeline .head div { padding:6px 8px; text-align:center; }
-.timeline .rows { position:relative; }
-.timeline .row { display:grid; grid-template-columns: 200px 1fr; border-top:1px solid var(--line,#e6e6e6); }
-.timeline .row > div { padding:6px 8px; }
-.timeline .label { font-size:12px; color:var(--ink,#111); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.timeline .grid { position:relative; height:28px; display:grid; grid-template-columns: repeat(12, 1fr); }
-.timeline .grid div { border-left:1px dashed #eee; }
-.bar { position:absolute; height:18px; top:5px; border-radius:9px; border:1px solid var(--line,#e6e6e6); }
-.bar.orange { background:#fff7ed; border-color:#fed7aa; }
-.bar.green  { background:#ecfdf5; border-color:#bbf7d0; }
-.bar.red    { background:#fff1f2; border-color:#fecdd3; }
-.kpi-chips { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px; }
-.kpi-chips .chip { border:1px solid var(--line,#e6e6e6); background:#fff; border-radius:999px; padding:4px 10px; font-size:12px; }
-.status-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:6px; vertical-align:middle; }
-.dot-orange { background:#fb923c; }
-.dot-green  { background:#22c55e; }
-.dot-red    { background:#ef4444; }
-</style>
-
-<section id="tab-calendar" class="tab card hidden">
-  <h3>Kalender</h3>
-
-  <div class="toolbar" style="margin-bottom:8px; display:flex; gap:8px; flex-wrap:wrap;">
-    <select id="calStatus">
-      <option value="">Status: alles</option>
-      <option value="voorgenomen">Voorgenomen</option>
-      <option value="definitief">Definitief</option>
-      <option value="afgewezen">Afgewezen</option>
-    </select>
-
-    <select id="calDept"><option value="">Afdeling: alles</option></select>
-    <select id="calOffice"><option value="">CO: alles</option></select>
-
-    <select id="calQtr">
-      <option value="">Qtr: alles</option>
-      <option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option>
-    </select>
-
-    <input id="calFrom" type="date" />
-    <input id="calTo"   type="date" />
-    <input id="calWeek" type="week" />
-    <button id="calToday" class="btn">Vandaag</button>
-    <button id="calReset" class="btn">Reset</button>
-    <button id="calOnlyApproved" class="btn">Alleen definitief</button>
-  </div>
-
-  <div class="kpi-chips">
-    <span class="chip"><span class="status-dot dot-orange"></span> Voorgenomen: <b id="calCountPending">0</b></span>
-    <span class="chip"><span class="status-dot dot-green"></span> Definitief: <b id="calCountApproved">0</b></span>
-    <span class="chip"><span class="status-dot dot-red"></span> Afgewezen: <b id="calCountRejected">0</b></span>
-  </div>
-
-  <div id="calendarTimeline" class="timeline" style="margin-bottom:8px"></div>
-
-  <div class="card" style="padding:0;overflow:auto">
-    <table id="calTable">
-      <thead>
-        <tr>
-          <th>Status</th><th>Afdeling</th><th>CO</th>
-          <th>Periode</th><th>Qtr</th><th>Dagen</th><th></th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-  </div>
-</section>
-
-<script type="module">
-// === Imports (veilig om nogmaals te importeren) ===
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
-import { getFirestore, collection, query, onSnapshot, doc, getDoc, getDocs } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
-
-// === Fallback helpers (gebruikt jouw globale helpers als ze bestaan) ===
-const fmtDate = window.fmtDate || (s => s ? new Date(s).toLocaleDateString('nl-NL') : '');
-const daysBetween = window.daysBetween || ((a,b)=> Math.floor((new Date(b)-new Date(a))/(1000*60*60*24))+1);
-const statusPill = window.statusPill || (s=>{
-  const m=(s||'').toLowerCase();
-  if(m==='definitief') return '<span class="pill green"><span class="status-dot dot-green"></span>definitief</span>';
-  if(m==='afgewezen')  return '<span class="pill red"><span class="status-dot dot-red"></span>afgewezen</span>';
-  return '<span class="pill orange"><span class="status-dot dot-orange"></span>voorgenomen</span>';
-});
-const openDetails = window.openDetails || (t=> alert(JSON.stringify(t,null,2)));
-
-// === DB/Auth (gebruik globale db indien aanwezig) ===
-const auth = getAuth();
-const _db = (typeof window.db !== 'undefined') ? window.db : getFirestore();
-
-// === DOM refs ===
-const calTab = document.getElementById('tab-calendar');
-const calStatus = document.getElementById('calStatus');
-const calDept   = document.getElementById('calDept');
-const calOffice = document.getElementById('calOffice');
-const calQtr    = document.getElementById('calQtr');
-const calFrom   = document.getElementById('calFrom');
-const calTo     = document.getElementById('calTo');
-const calWeek   = document.getElementById('calWeek');
-const calToday  = document.getElementById('calToday');
-const calReset  = document.getElementById('calReset');
-const calOnlyApproved = document.getElementById('calOnlyApproved');
-const calTBody  = document.querySelector('#calTable tbody');
-const calTimeline = document.getElementById('calendarTimeline');
-const calCountPending  = document.getElementById('calCountPending');
-const calCountApproved = document.getElementById('calCountApproved');
-const calCountRejected = document.getElementById('calCountRejected');
-
-// === Filters vullen (uit globale arrays of Firestore) ===
-async function populateFilters(){
-  // DEP
-  if (calDept && calDept.options.length === 1){
-    if (Array.isArray(window.DEPARTMENTS)) {
-      window.DEPARTMENTS.forEach(d=>{ const op=document.createElement('option'); op.value=d; op.textContent=d; calDept.appendChild(op); });
-    } else {
-      try {
-        const snap = await getDocs(collection(_db,'departments'));
-        snap.forEach(d=>{ const op=document.createElement('option'); op.value=d.id; op.textContent=d.id; calDept.appendChild(op); });
-      } catch(_) {}
-    }
-  }
-  // OFFICES
-  if (calOffice && calOffice.options.length === 1){
-    if (Array.isArray(window.OFFICES)) {
-      window.OFFICES.forEach(o=>{ const op=document.createElement('option'); op.value=o; op.textContent=o; calOffice.appendChild(op); });
-    } else {
-      try {
-        const snap = await getDocs(collection(_db,'offices'));
-        snap.forEach(d=>{ const op=document.createElement('option'); op.value=d.id; op.textContent=d.id; calOffice.appendChild(op); });
-      } catch(_) {}
-    }
-  }
-}
-
-// === Utils ===
-function ymd(date){
-  const d=new Date(date), y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0');
-  return `${y}-${m}-${dd}`;
-}
-function weekRange(iso){
-  if(!iso || !iso.includes('-W')) return [null,null];
-  const [y, wStr] = iso.split('-W'); const w = parseInt(wStr,10), year=parseInt(y,10);
-  const jan4 = new Date(year,0,4), day = jan4.getDay() || 7;
-  const monW1 = new Date(jan4); monW1.setDate(jan4.getDate() - (day-1));
-  const mon = new Date(monW1); mon.setDate(monW1.getDate() + (w-1)*7);
-  const sun = new Date(mon);   sun.setDate(mon.getDate()+6);
-  return [mon,sun];
-}
-function ensureDefaultYearRange(){
-  if (!calFrom.value || !calTo.value) {
-    const now = new Date(); const y = now.getFullYear();
-    calFrom.value = `${y}-01-01`;
-    calTo.value   = `${y}-12-31`;
-  }
-}
-function clampDate(s, min, max){ const d=new Date(s); return d<min? new Date(min) : d>max? new Date(max) : d; }
-function barLeftWidthWithinYear(startStr, endStr, year){
-  const yearStart = new Date(year,0,1), yearEnd=new Date(year,11,31);
-  const s = clampDate(startStr, yearStart, yearEnd);
-  const e = clampDate(endStr,   yearStart, yearEnd);
-  const total = (yearEnd - yearStart) || 1;
-  const left = ((s - yearStart) / total) * 100;
-  const width = Math.max(1, ((e - s) / total) * 100);
-  return [left, width];
-}
-
-// === Data/state ===
-let _calData = [];
-let _calUnsub = null;
-
-// === Filteren & renderen ===
-function filterRows(){
-  ensureDefaultYearRange();
-  const s = (calStatus.value||'').toLowerCase();
-  const dep = calDept.value || '';
-  const off = calOffice.value || '';
-  const qtr = calQtr.value || '';
-  const from = calFrom.value || '';
-  const to   = calTo.value   || '';
-
-  let rows = _calData.slice();
-  rows = rows.filter(t=>{
-    if (s && (t.status||'').toLowerCase() !== s) return false;
-    if (dep && (t.department||'') !== dep) return false;
-    if (off && (t.officeCountry||'') !== off) return false;
-    if (qtr && (t.qtr||'') !== qtr) return false;
-
-    if (from || to) {
-      const start = t.startDate || '';
-      const end   = t.endDate   || '';
-      if (from && end && end < from) return false;
-      if (to && start && start > to) return false;
-    }
-    return true;
-  });
-  return rows.sort((a,b)=>(a.startDate||'').localeCompare(b.startDate||''));
-}
-
-function renderCounts(allRows){
-  const p = allRows.filter(t=>(t.status||'').toLowerCase()==='voorgenomen').length;
-  const a = allRows.filter(t=>(t.status||'').toLowerCase()==='definitief').length;
-  const r = allRows.filter(t=>(t.status||'').toLowerCase()==='afgewezen').length;
-  calCountPending.textContent = p;
-  calCountApproved.textContent = a;
-  calCountRejected.textContent = r;
-}
-
-function renderTimeline(rows){
-  const y = new Date(calFrom.value || new Date()).getFullYear();
-  const months = ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
-
-  let html = `<div class="head">${months.map(m=>`<div>${m}</div>`).join('')}</div><div class="rows">`;
-  const show = rows.slice(0, 40); // cap 40 rijen
-  show.forEach(t=>{
-    const color = (t.status==='definitief') ? 'green' : (t.status==='afgewezen') ? 'red' : 'orange';
-    const [left,width] = barLeftWidthWithinYear(t.startDate, t.endDate, y);
-    const label = `${t.department||''} • ${t.officeCountry||''}${t.city?(' • '+t.city):''}`;
-    html += `<div class="row">
-      <div class="label" title="${(t.title||'').replace(/"/g,'&quot;')}">${label}</div>
-      <div class="grid">${'<div></div>'.repeat(12)}
-        <div class="bar ${color}" style="left:${left}%; width:${width}%;" title="${(t.title||'').replace(/"/g,'&quot;')} (${t.qtr||''})"></div>
-      </div>
-    </div>`;
-  });
-  html += `</div>`;
-  calTimeline.innerHTML = html;
-}
-
-function renderCalendarTable(rows){
-  calTBody.innerHTML = '';
-  if (rows.length === 0) {
-    calTBody.innerHTML = '<tr><td colspan="7" class="muted">Geen reizen in selectie.</td></tr>';
-    return;
-  }
-  rows.forEach(t=>{
-    const html = `<tr>
-      <td>${statusPill(t.status)}</td>
-      <td>${t.department||''}</td>
-      <td>${t.officeCountry||''}${t.city?(' • '+t.city):''}</td>
-      <td>${fmtDate(t.startDate)} – ${fmtDate(t.endDate)}</td>
-      <td>${t.qtr||''}</td>
-      <td>${t.durationDays || (t.startDate&&t.endDate? daysBetween(t.startDate,t.endDate): '')}</td>
-      <td class="right"><button class="btn" data-cal-details="${t.id}">Toon details</button></td>
-    </tr>`;
-    calTBody.insertAdjacentHTML('beforeend', html);
-  });
-  // details
-  calTBody.querySelectorAll('[data-cal-details]').forEach(btn=>{
-    btn.addEventListener('click', async ()=>{
-      const id = btn.getAttribute('data-cal-details');
-      try {
-        const s = await getDoc(doc(_db,'trips', id));
-        if (s.exists()) openDetails({id, ...s.data()});
-      } catch(e) { alert('Details: '+(e.code||e.message)); }
-    });
-  });
-}
-
-function renderCalendar(){
-  const rows = filterRows();
-  renderCounts(_calData);    // counters op alle data
-  renderTimeline(rows);      // timeline op gefilterde data
-  renderCalendarTable(rows); // tabel op gefilterde data
-}
-
-// === Listener opbouwen ===
-async function buildCalendar(){
-  await populateFilters();
-  ensureDefaultYearRange();
-  if (_calUnsub) { renderCalendar(); return; }
-  try {
-    _calUnsub = onSnapshot(query(collection(_db,'trips')), (snap)=>{
+  // ---- CALENDAR (simple list by view) ----
+  const calView=$("#calView"), calQtr=$("#calQtr"), calMonth=$("#calMonth"), calWeek=$("#calWeek"), calendarArea=$("#calendarArea");
+  [calView, calQtr, calMonth, calWeek].forEach(el=> el.addEventListener('change', buildCalendar));
+  function buildCalendar(){
+    if(!currentUser) return;
+    const v = calView.value;
+    calendarArea.innerHTML = '';
+    // V1: we tonen gefilterde lijst (kan later Gantt worden)
+    const qTrips = query(collection(db,'trips'), orderBy('startDate','asc'));
+    onSnapshot(qTrips, (snap)=>{
       const rows=[]; snap.forEach(d=> rows.push({id:d.id, ...d.data()}));
-      _calData = rows;
-      renderCalendar();
-    }, (err)=> {
-      console.error('[Kalender] onSnapshot error:', err);
-      calTimeline.innerHTML = `<div style="padding:8px;color:#b00">Kalender fout: ${err.code||err.message}</div>`;
+      let filtered = rows;
+      if(v==='quarter'){ filtered = rows.filter(r=> r.qtr===calQtr.value); }
+      // month/week filters optioneel (V1 simplificatie)
+      const wrap = document.createElement('div');
+      if(filtered.length===0){ wrap.innerHTML='<div class="muted">Geen reizen in deze weergave.</div>'; }
+      else{
+        const tbl = document.createElement('table');
+        tbl.innerHTML = `<thead><tr><th>Status</th><th>Titel</th><th>Afdeling</th><th>CO</th><th>Periode</th><th>Qtr</th></tr></thead><tbody></tbody>`;
+        const tb = tbl.querySelector('tbody');
+        filtered.forEach(t=>{
+          tb.insertAdjacentHTML('beforeend', `<tr>
+            <td>${statusPill(t.status)}</td>
+            <td>${t.title}</td>
+            <td>${t.department||''}</td>
+            <td>${t.officeCountry||''}</td>
+            <td>${fmtDate(t.startDate)} – ${fmtDate(t.endDate)}</td>
+            <td>${t.qtr||''}</td>
+          </tr>`);
+        });
+        wrap.appendChild(tbl);
+      }
+      calendarArea.innerHTML=''; calendarArea.appendChild(wrap);
     });
-  } catch(e) {
-    console.error('[Kalender] init error:', e);
-    calTimeline.innerHTML = `<div style="padding:8px;color:#b00">Init fout: ${e.message}</div>`;
   }
-}
 
-// === Events ===
-[calStatus, calDept, calOffice, calQtr, calFrom, calTo].forEach(el=>{
-  el && el.addEventListener('change', renderCalendar);
-});
-calWeek && calWeek.addEventListener('change', ()=>{
-  const [mon, sun] = weekRange(calWeek.value);
-  if (mon && sun) {
-    calFrom.value = ymd(mon);
-    calTo.value   = ymd(sun);
-    renderCalendar();
-  }
-});
-calToday && calToday.addEventListener('click', ()=>{
-  const today = new Date();
-  calFrom.value = ymd(today);
-  calTo.value   = ymd(today);
-  renderCalendar();
-});
-calReset && calReset.addEventListener('click', ()=>{
-  calStatus.value=''; calDept.value=''; calOffice.value=''; calQtr.value='';
-  calFrom.value=''; calTo.value=''; calWeek.value='';
-  renderCalendar(); // zet weer jaar-default
-});
-calOnlyApproved && calOnlyApproved.addEventListener('click', ()=>{
-  calStatus.value = 'definitief';
-  renderCalendar();
-});
-
-// === Start na login ===
-onAuthStateChanged(auth, (u)=>{
-  if(u){ buildCalendar(); }
-});
-if (auth.currentUser) { buildCalendar(); } // fallback als al ingelogd
-</script>
-<!-- ====== EINDE KALENDER ====== -->
- // ---- DASHBOARD ----
+  // ---- DASHBOARD ----
   const kpiTrips=$("#kpiTrips"), kpiBudget=$("#kpiBudget"), kpiCO2=$("#kpiCO2"), dashDeptFilter=$("#dashDeptFilter"), dashTableWrap=$("#dashTableWrap");
   dashDeptFilter.addEventListener('input', loadDashboard);
   function loadDashboard(){
@@ -962,6 +676,5 @@ if (auth.currentUser) { buildCalendar(); } // fallback als al ingelogd
   calView.value = 'quarter'; calQtr.value='Q4';
 
 </script>
-  
 </body>
 </html>
