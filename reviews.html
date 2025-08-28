@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Dorcas Year Planner — Reviews</title>
+  <style>
+    :root{
+      --bg:#f6f7f9; --card:#fff; --ink:#111; --muted:#667085; --line:#e6e6e6;
+      --ok:#22c55e; --warn:#fb923c; --bad:#ef4444;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial;background:var(--bg);color:var(--ink)}
+    header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2}
+    h1{font-size:18px;margin:0}
+    .main{max-width:1100px;margin:24px auto;padding:0 16px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+    .btn{border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 12px;cursor:pointer}
+    .btn[disabled]{opacity:.5;cursor:not-allowed}
+    .muted{color:var(--muted)}
+    .hidden{display:none}
+
+    /* Reviews styles */
+    .reviews-wrap{display:flex;flex-direction:column;gap:14px}
+    .review-card{border:1px solid var(--line);border-radius:14px;background:#fff;padding:14px}
+    .review-head{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+    .review-title{font-size:18px;font-weight:700;line-height:1.2}
+    .review-meta{color:var(--muted);font-size:13px}
+    .review-pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:#fafafa}
+    .pill-green{background:#ecfdf5;border-color:#bbf7d0}
+    .pill-orange{background:#fff7ed;border-color:#fed7aa}
+    .pill-red{background:#fff1f2;border-color:#fecdd3}
+    .dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+    .dot-green{background:var(--ok)} .dot-orange{background:var(--warn)} .dot-red{background:var(--bad)}
+
+    .review-grid{display:grid;grid-template-columns:minmax(160px,240px) 1fr;gap:8px 16px;margin-top:10px}
+    .review-label{color:#475467;font-size:14px}
+    .review-value{font-size:15px;font-weight:500}
+    .review-subtle{color:#667085;font-weight:400}
+
+    .review-approvals{display:grid;grid-template-columns:repeat(3,minmax(180px,1fr));gap:8px;margin-top:10px}
+    .approval-box{border:1px dashed #e5e7eb;border-radius:10px;padding:10px;background:#fcfcfc}
+    .approval-title{font-size:13px;color:#475467;margin-bottom:6px}
+    .approval-status{font-size:14px;font-weight:600}
+    .approval-note{color:#475467;white-space:pre-wrap;font-size:13px;margin-top:6px}
+    .approval-time{color:#98a2b3;font-size:12px;margin-top:4px}
+    .review-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:12px}
+
+    /* Auth panel */
+    .auth{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    input[type="email"],input[type="password"]{border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Dorcas Year Planner — Reviews</h1>
+    <div class="auth" id="authPanel">
+      <input type="email" id="email" placeholder="naam@dorcas.nl" />
+      <input type="password" id="password" placeholder="wachtwoord" />
+      <button class="btn" id="btnLogin">Inloggen</button>
+      <button class="btn" id="btnRegister">Account aanmaken</button>
+      <button class="btn hidden" id="btnLogout">Uitloggen</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <div id="domainWarn" class="card hidden">Alleen <strong>@dorcas.nl</strong> accounts zijn toegestaan.</div>
+
+    <!-- ===== Reviews Tab ===== -->
+    <section id="tab-reviews" class="card">
+      <h3 style="margin:0 0 10px 0">Reviews</h3>
+      <div id="reviewsList" class="reviews-wrap"></div>
+    </section>
+  </div>
+
+  <!-- Firebase SDKs -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+    import {
+      getFirestore, collection, query, onSnapshot, getDocs, setDoc, getDoc,
+      doc, serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+
+    // --- Firebase config (jouw project) ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyAh8NlJEsAimk5XetB46b4hVmT83ZbHc4o",
+      authDomain: "dorcas-travel-planner.firebaseapp.com",
+      projectId: "dorcas-travel-planner",
+      storageBucket: "dorcas-travel-planner.firebasestorage.app",
+      messagingSenderId: "964093814653",
+      appId: "1:964093814653:web:5f5a542f9593f82cfe0e14",
+      measurementId: "G-PZ3N4JRKQ3"
+    };
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth();
+    const db   = getFirestore();
+
+    // --- helpers ---
+    const $ = (sel)=>document.querySelector(sel);
+    const fmtDate = (s => s ? new Date(s).toLocaleDateString('nl-NL') : '');
+    const fmtEUR  = (n => new Intl.NumberFormat('nl-NL',{style:'currency',currency:'EUR'}).format(n||0));
+    const safe = v => (v==null?'':String(v)).replace(/[<>&]/g, s=>({ '<':'&lt;','>':'&gt;','&':'&amp;' }[s]));
+    const tsNL = ts => ts?.toDate ? ts.toDate().toLocaleString('nl-NL') : '';
+    function statusPill(s){
+      const m=(s||'').toLowerCase();
+      if(m==='definitief') return `<span class="review-pill pill-green"><span class="dot dot-green"></span>definitief</span>`;
+      if(m==='afgewezen')  return `<span class="review-pill pill-red"><span class="dot dot-red"></span>afgewezen</span>`;
+      return `<span class="review-pill pill-orange"><span class="dot dot-orange"></span>voorgenomen</span>`;
+    }
+    function actorStepFromRole(role){
+      const r=(role||'').toLowerCase();
+      if(r==='manager') return 'manager';
+      if(r==='cd')      return 'cd';
+      if(r==='hr')      return 'hr';
+      if(r==='admin')   return 'manager'; // admin handelt als manager
+      return null;
+    }
+
+    // --- Auth UI ---
+    const emailEl = $('#email'), passEl = $('#password');
+    const btnLogin = $('#btnLogin'), btnRegister=$('#btnRegister'), btnLogout=$('#btnLogout');
+    const authPanel = $('#authPanel'), domainWarn = $('#domainWarn');
+
+    btnLogin.addEventListener('click', async ()=>{
+      try{
+        await signInWithEmailAndPassword(auth, emailEl.value.trim(), passEl.value);
+      }catch(e){ alert('Login: '+(e.code||e.message)); }
+    });
+    btnRegister.addEventListener('click', async ()=>{
+      try{
+        const mail = emailEl.value.trim();
+        if(!/@dorcas\.nl$/i.test(mail)) return alert('Gebruik een @dorcas.nl e-mail.');
+        await createUserWithEmailAndPassword(auth, mail, passEl.value);
+      }catch(e){ alert('Registreren: '+(e.code||e.message)); }
+    });
+    btnLogout.addEventListener('click', ()=> signOut(auth));
+
+    // --- userDoc (rol) ---
+    let currentUser = null;
+    let currentUserDoc = null;
+    async function ensureUserDoc(u){
+      const ref = doc(db,'users', u.uid);
+      const s = await getDoc(ref);
+      if(!s.exists()){
+        await setDoc(ref, {
+          uid: u.uid, email: u.email, displayName: u.displayName || '',
+          role: 'traveler', createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+        }, {merge:true});
+        return { role:'traveler' };
+      }
+      return s.data();
+    }
+
+    onAuthStateChanged(auth, async (u)=>{
+      currentUser = u || null;
+      if(!u){
+        btnLogout.classList.add('hidden');
+        btnLogin.classList.remove('hidden'); btnRegister.classList.remove('hidden');
+        emailEl.classList.remove('hidden'); passEl.classList.remove('hidden');
+        $('#tab-reviews').classList.add('hidden');
+        domainWarn.classList.add('hidden');
+        return;
+      }
+      // domain check
+      const isDorcas = /@dorcas\.nl$/i.test(u.email||'');
+      domainWarn.classList.toggle('hidden', isDorcas);
+      // toggle UI
+      btnLogout.classList.remove('hidden');
+      btnLogin.classList.add('hidden'); btnRegister.classList.add('hidden');
+      emailEl.classList.add('hidden'); passEl.classList.add('hidden');
+      $('#tab-reviews').classList.remove('hidden');
+
+      // rol laden/aanmaken
+      currentUserDoc = await ensureUserDoc(u);
+
+      // start reviews
+      loadReviewQueue();
+    });
+
+    // --- Reviews loader & renderer ---
+    const reviewsList = $('#reviewsList');
+    let unsubReviews = null;
+
+    function box(title, rec){
+      const d=(rec?.decision)||'pending';
+      const pill =
+        d==='approved' ? `<span class="review-pill pill-green"><span class="dot dot-green"></span>approved</span>` :
+        d==='rejected' ? `<span class="review-pill pill-red"><span class="dot dot-red"></span>rejected</span>` :
+        d==='alt'      ? `<span class="review-pill"><span class="dot dot-orange"></span>alternatief</span>` :
+                         `<span class="review-pill"><span class="dot dot-orange"></span>pending</span>`;
+      return `<div class="approval-box">
+        <div class="approval-title">${title}</div>
+        <div class="approval-status">${pill}</div>
+        ${rec?.note ? `<div class="approval-note">${safe(rec.note)}</div>` : ''}
+        ${rec?.decidedAt ? `<div class="approval-time">${tsNL(rec.decidedAt)}</div>` : ''}
+      </div>`;
+    }
+
+    function renderReviews(items){
+      const myRole = (currentUserDoc?.role)||'traveler';
+      const myStep = actorStepFromRole(myRole);
+
+      // pending eerst
+      const pending = items.filter(x => (x.trip.status||'').toLowerCase()==='voorgenomen');
+      const others  = items.filter(x => (x.trip.status||'').toLowerCase()!=='voorgenomen');
+      const all = [...pending, ...others];
+
+      if(!all.length){ reviewsList.innerHTML = '<div class="review-meta">Geen reizen gevonden.</div>'; return; }
+
+      reviewsList.innerHTML = '';
+      all.forEach(({trip, ap})=>{
+        const mgr = ap.manager?.decision || 'pending';
+        const cd  = ap.cd?.decision      || 'pending';
+        const hr  = ap.hr?.decision      || 'pending';
+
+        // wie mag beslissen?
+        const gateOK =
+          (myStep==='manager') ||
+          (myStep==='cd' && mgr==='approved') ||
+          (myStep==='hr' && mgr==='approved' && cd==='approved');
+        const myState = myStep ? (ap[myStep]?.decision || 'pending') : null;
+        const canAct  = !!(myStep && gateOK && myState==='pending');
+
+        const purpose = trip.purpose || trip.purposeOfTravel || '';
+        const budget  = (trip.budgetEffectiveTotal ?? trip.budgetDefaultTotal ?? 0);
+        const co2     = (trip.co2EffectiveTotalTon ?? trip.co2TotalTon ?? 0);
+        const days    = trip.durationDays ?? '';
+
+        const card = `
+          <div class="review-card" data-id="${trip.id}">
+            <div class="review-head">
+              <div>
+                <div class="review-title">${safe(trip.title||'(zonder titel)')}</div>
+                <div class="review-meta">${safe(trip.department||'')} • ${safe(trip.officeCountry||'')}${trip.city?(' • '+safe(trip.city)):""}</div>
+                <div class="review-meta">${fmtDate(trip.startDate)} – ${fmtDate(trip.endDate)} • ${safe(trip.qtr||'')} ${days?('• '+days+' dagen'):''}</div>
+              </div>
+              <div class="right" style="text-align:right">
+                <div>${statusPill(trip.status)}</div>
+                <div class="review-meta">Budget (default): <strong>${fmtEUR(budget)}</strong></div>
+                <div class="review-meta">CO₂ (t) (default): <strong>${(co2||0).toFixed(2)}</strong></div>
+              </div>
+            </div>
+
+            <div class="review-grid">
+              <div class="review-label">Purpose of travel</div>
+              <div class="review-value">${safe(purpose||'(geen doel opgegeven)')}</div>
+
+              <div class="review-label">Type</div>
+              <div class="review-value">${safe(trip.type||'')}</div>
+
+              <div class="review-label">Vervoer</div>
+              <div class="review-value">${safe(trip.transport||'')}</div>
+
+              <div class="review-label">Externe partner (bedrijf/organisatie)</div>
+              <div class="review-value">${safe(trip.partnerOrg||'')}</div>
+
+              <div class="review-label">IO Budget</div>
+              <div class="review-value">${trip.ioBudget ? 'Ja' : 'Nee'}</div>
+
+              <div class="review-label">CombiCode</div>
+              <div class="review-value">${safe(trip.combiCode||'')}</div>
+
+              <div class="review-label">Reiziger UID</div>
+              <div class="review-value review-subtle">${safe(trip.travelerUid||'')}</div>
+
+              <div class="review-label">Document ID</div>
+              <div class="review-value review-subtle">${safe(trip.id)}</div>
+            </div>
+
+            <div class="review-approvals">
+              ${box('Manager', ap.manager)}
+              ${box('Country Director', ap.cd)}
+              ${box('HR / Safety', ap.hr)}
+            </div>
+
+            <div class="review-actions">
+              ${canAct ? `
+                <button class="btn" data-act="approve" data-trip="${trip.id}" data-step="${actorStepFromRole(currentUserDoc?.role)}">Akkoord</button>
+                <button class="btn" data-act="reject"  data-trip="${trip.id}" data-step="${actorStepFromRole(currentUserDoc?.role)}">Afwijzen</button>
+                <button class="btn" data-act="alt"     data-trip="${trip.id}" data-step="${actorStepFromRole(currentUserDoc?.role)}">Alternatief</button>
+              ` : ''}
+            </div>
+          </div>
+        `;
+        reviewsList.insertAdjacentHTML('beforeend', card);
+      });
+    }
+
+    function loadReviewQueue(){
+      if(!currentUser) return;
+      const qTrips = query(collection(db,'trips'));
+      if (window._unsubReviews) window._unsubReviews();
+      window._unsubReviews = onSnapshot(qTrips, async (snap)=>{
+        const entries=[]; const jobs=[];
+        snap.forEach(d=>{
+          const trip = {id:d.id, ...d.data()};
+          jobs.push((async ()=>{
+            const ap={};
+            try{
+              const aSnap = await getDocs(collection(db, `trips/${trip.id}/approvals`));
+              aSnap.forEach(x=> ap[x.id]=x.data());
+            }catch(_) {}
+            entries.push({trip, ap});
+          })());
+        });
+        await Promise.all(jobs);
+        // sorteer op start
+        entries.sort((a,b)=> (a.trip.startDate||'').localeCompare(b.trip.startDate||''));
+        renderReviews(entries);
+      }, (err)=> {
+        reviewsList.innerHTML = `<div class="review-meta" style="color:#b42318">Reviews fout: ${err.code||err.message}</div>`;
+      });
+    }
+
+    // Click handler voor approvals
+    document.getElementById('reviewsList')?.addEventListener('click', async (e)=>{
+      const btn = e.target.closest('button'); if(!btn) return;
+
+      const act    = btn.dataset.act;
+      const tripId = btn.dataset.trip;
+      let step     = btn.dataset.step;
+
+      const role = (currentUserDoc?.role)||'traveler';
+      if (!step) step = actorStepFromRole(role);
+      if (!step || !tripId || !currentUser) return;
+
+      const note = act==='alt' ? (prompt("Alternatief/reden:","")||'') : '';
+      const decision = act==='approve' ? 'approved' : (act==='reject' ? 'rejected' : 'alt');
+
+      try{
+        await setDoc(doc(db,`trips/${tripId}/approvals/${step}`), {
+          step, decision, note,
+          decidedAt: serverTimestamp(),
+          decidedByUid: currentUser.uid,
+          decidedByName: currentUser.displayName || currentUser.email
+        }, { merge:true });
+
+        // Auto-definitief na 3× approved
+        const aSnap = await getDocs(collection(db,`trips/${tripId}/approvals`));
+        const ap = {}; aSnap.forEach(x=> ap[x.id]=x.data());
+        if(ap.manager?.decision==='approved' && ap.cd?.decision==='approved' && ap.hr?.decision==='approved'){
+          await setDoc(doc(db,'trips',tripId), { status:'definitief' }, { merge:true });
+          alert("Reis is definitief (groen).");
+        }
+      }catch(err){
+        alert(err.code + ' — ' + err.message);
+      }
+    });
+  </script>
+</body>
+</html>
