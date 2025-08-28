@@ -417,6 +417,41 @@
     }catch(err){ alert(err.message); }
   });
 
+<script type="module">
+// ---- Firebase imports (v12) ----
+import {
+  getFirestore, collection, doc,
+  getDoc, getDocs, deleteDoc,
+  query, where, onSnapshot
+} from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+
+// Je initializeApp(...) moet al eerder in de pagina staan.
+// db + auth ophalen van de *default app*:
+const db   = window.db || getFirestore();
+const auth = getAuth();
+
+// currentUser up-to-date houden
+let currentUser = auth.currentUser || null;
+onAuthStateChanged(auth, (u)=> { currentUser = u || null; });
+
+// ---- Helpers (alleen aanmaken als je ze nog niet hebt) ----
+window.fmtDate = window.fmtDate || (s => s ? new Date(s).toLocaleDateString('nl-NL') : '');
+window.fmtEUR  = window.fmtEUR  || (n => new Intl.NumberFormat('nl-NL', { style:'currency', currency:'EUR' }).format(n||0));
+window.openDetails = window.openDetails || (t => alert(typeof t==='object' ? JSON.stringify(t,null,2) : String(t)));
+
+// Handige mini-$ helper
+window.$ = window.$ || (sel => document.querySelector(sel));
+
+// Exporteer naar window als jouw andere scripts hierbuiten draaien:
+window.db = db;
+window.currentUser = currentUser;
+
+// (optioneel) log om te checken
+console.log('[Bootstrap] Firestore helpers klaar');
+</script>
+
+
 // ---- LIST MY TRIPS (v2) ----
 const tripsTableBody = $("#tripsTable tbody");
 
