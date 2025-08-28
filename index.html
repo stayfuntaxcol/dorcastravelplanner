@@ -449,8 +449,20 @@
     });
   }
 
- // ---- REVIEWS (iedereen ziet pending; knoppen per rol/volgorde) ----
-const reviewsList = $("#reviewsList");
+ // ===================== REVIEWS (iedereen ziet pending; knoppen per rol) =====================
+
+// 1) DOM anchor
+const reviewsList = document.getElementById('reviewsList');
+
+// 2) Helpers
+function actorStepFromRole(role){
+  const r = (role||'').toLowerCase();
+  if (r==='manager') return 'manager';
+  if (r==='cd')      return 'cd';
+  if (r==='hr')      return 'hr';
+  if (r==='admin')   return 'manager'; // admin handelt als manager
+  return null; // traveler etc.
+}
 
 function approvalButtons(tripId, step, currentDecision){
   const disabled = currentDecision!=='pending' ? 'disabled' : '';
@@ -461,34 +473,25 @@ function approvalButtons(tripId, step, currentDecision){
   </div>`;
 }
 
-function actorStepFromRole(role){
-  const r = (role||'').toLowerCase();
-  if (r==='manager') return 'manager';
-  if (r==='cd')      return 'cd';
-  if (r==='hr')      return 'hr';
-  if (r==='admin')   return 'manager'; // admin handelt als manager
-  return null; // traveler: geen knoppen
-}
-
-async function loadReviewQueue(){
+// 3) Loader
+function loadReviewQueue(){
   if(!currentUser) return;
 
   const myRole = (currentUserDoc?.role)||'traveler';
   const myStep = actorStepFromRole(myRole);
 
-  // Haal ALLE trips en filter client-side op pending, zodat je altijd iets ziet
-  const qTrips = query(collection(db,'trips')); 
+  // Haal ALLE trips; filter client-side naar 'voorgenomen' zodat je altijd iets ziet
+  const qTrips = query(collection(db,'trips'));
   onSnapshot(qTrips, async (snap)=>{
-    const entries = [];
-    const jobs = [];
+    const entries=[]; const jobs=[];
     snap.forEach(d=>{
       const trip = {id:d.id, ...d.data()};
       jobs.push((async ()=>{
-        let ap = {};
-        try {
+        let ap={};
+        try{
           const aSnap = await getDocs(collection(db, `trips/${trip.id}/approvals`));
           aSnap.forEach(x=> ap[x.id]=x.data());
-        } catch(e) {
+        }catch(e){
           console.warn('[REVIEWS] approvals read failed', trip.id, e.code);
           ap = {};
         }
@@ -497,29 +500,28 @@ async function loadReviewQueue(){
     });
     await Promise.all(jobs);
 
-    // Alleen pending (status exact 'voorgenomen')
     const pending = entries.filter(({trip}) => (trip.status||'').toLowerCase()==='voorgenomen');
 
-    // Render
+    if(!reviewsList) return;
     if(pending.length===0){
       reviewsList.innerHTML = '<div class="muted">Geen pending reizen gevonden.</div>';
       return;
     }
-    reviewsList.innerHTML = '';
 
+    reviewsList.innerHTML = '';
     pending.forEach(({trip, ap})=>{
       const mgr = ap.manager?.decision || 'pending';
       const cd  = ap.cd?.decision      || 'pending';
       const hr  = ap.hr?.decision      || 'pending';
 
-      // volgordelogica: wie mag nú beslissen?
+      // wie mag nu beslissen?
       const gateOK =
         (myStep==='manager') ||
         (myStep==='cd' && mgr==='approved') ||
         (myStep==='hr' && mgr==='approved' && cd==='approved');
 
       const myState = myStep ? (ap[myStep]?.decision || 'pending') : null;
-      const canAct = !!(myStep && gateOK && myState==='pending');
+      const canAct  = !!(myStep && gateOK && myState==='pending');
 
       const html = `<div class="card">
         <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
@@ -530,7 +532,10 @@ async function loadReviewQueue(){
           </div>
           <div>
             <div>${statusPill(trip.status)}</div>
-            <div class="muted right">${fmtEUR(trip.budgetEffectiveTotal ?? trip.budgetDefaultTotal ?? 0)} • ${(trip.co2EffectiveTotalTon ?? trip.co2TotalTon ?? 0).toFixed(1)} t</div>
+            <div class="muted right">
+              ${fmtEUR(trip.budgetEffectiveTotal ?? trip.budgetDefaultTotal ?? 0)} •
+              ${(trip.co2EffectiveTotalTon ?? trip.co2TotalTon ?? 0).toFixed(1)} t
+            </div>
           </div>
         </div>
 
@@ -547,25 +552,26 @@ async function loadReviewQueue(){
       </div>`;
       reviewsList.insertAdjacentHTML('beforeend', html);
     });
-  });
+  }, (err)=> alert('Reviews: '+err.code+' — '+err.message));
 }
 
-// Acties (approve/reject/alt)
-reviewsList.addEventListener('click', async (e)=>{
+// 4) Click-handler
+reviewsList?.addEventListener('click', async (e)=>{
   const b = e.target.closest('button'); if(!b) return;
 
-  // Details blijft altijd werken
-  if (b.dataset.details) {
+  // details
+  if (b.dataset.details){
     const id = b.dataset.details;
     const s = await getDoc(doc(db,'trips', id));
     if (s.exists()) openDetails({id, ...s.data()});
     return;
   }
 
-  const act   = b.dataset.act;
-  const tripId= b.dataset.trip;
-  const step  = b.dataset.step; // = 'manager'|'cd'|'hr' (admin → 'manager')
-  if(!step) return; // traveler heeft geen knoppen
+  const act    = b.dataset.act;
+  const tripId = b.dataset.trip;
+  let step     = b.dataset.step;
+  if (!step) step = actorStepFromRole(currentUserDoc?.role);
+  if (!step) return; // traveler heeft geen knoppen
 
   const note = act==='alt' ? (prompt("Alternatief/reden:","")||'') : '';
   const decision = act==='approve' ? 'approved' : (act==='reject' ? 'rejected' : 'alt');
@@ -576,9 +582,9 @@ reviewsList.addEventListener('click', async (e)=>{
       decidedAt: serverTimestamp(),
       decidedByUid: currentUser.uid,
       decidedByName: currentUser.displayName || currentUser.email
-    }, {merge:true});
+    }, { merge:true });
 
-    // auto-finalize
+    // auto-definitief na 3x approved
     const aSnap = await getDocs(collection(db,`trips/${tripId}/approvals`));
     const ap = {}; aSnap.forEach(x=> ap[x.id]=x.data());
     if(ap.manager?.decision==='approved' && ap.cd?.decision==='approved' && ap.hr?.decision==='approved'){
@@ -589,6 +595,9 @@ reviewsList.addEventListener('click', async (e)=>{
     alert(err.code + ' — ' + err.message);
   }
 });
+
+// 5) Zorg dat deze loader na login wordt aangeroepen (bij jou gebeurt dat al in onAuthStateChanged):
+// onAuthStateChanged(auth, ()=>{ ... loadReviewQueue(); ... });
 
   // ---- CALENDAR (simple list by view) ----
   const calView=$("#calView"), calQtr=$("#calQtr"), calMonth=$("#calMonth"), calWeek=$("#calWeek"), calendarArea=$("#calendarArea");
