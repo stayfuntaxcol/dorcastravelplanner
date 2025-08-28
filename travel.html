@@ -1,0 +1,612 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Dorcas Year Planner — Travel</title>
+  <style>
+    :root{
+      --bg:#f6f7f9; --card:#fff; --ink:#111; --muted:#667085; --line:#e6e6e6;
+      --ok:#22c55e; --warn:#fb923c; --bad:#ef4444;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font:14px/1.5 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Helvetica Neue',Arial;background:var(--bg);color:var(--ink)}
+    header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2}
+    h1{font-size:18px;margin:0}
+    .main{max-width:1100px;margin:24px auto;padding:0 16px}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    @media (max-width:980px){ .grid{grid-template-columns:1fr} }
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+    .btn{border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 12px;cursor:pointer}
+    .btn[disabled]{opacity:.5;cursor:not-allowed}
+    .muted{color:var(--muted)}
+    .hidden{display:none}
+    input[type="email"],input[type="password"],input[type="text"],input[type="date"],select,textarea{
+      border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff;width:100%
+    }
+    label{font-size:13px;color:#475467;display:block;margin-bottom:6px}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    @media (max-width:720px){ .row{grid-template-columns:1fr} }
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-top:1px solid var(--line);text-align:left;vertical-align:top}
+    th{font-weight:600;color:#475467;background:#fafafa}
+    td.right{text-align:right}
+
+    /* Pills */
+    .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:#fafafa}
+    .pill.green{background:#ecfdf5;border-color:#bbf7d0}
+    .pill.orange{background:#fff7ed;border-color:#fed7aa}
+    .pill.red{background:#fff1f2;border-color:#fecdd3}
+    .status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
+    .dot-green{background:var(--ok)} .dot-orange{background:var(--warn)} .dot-red{background:var(--bad)}
+
+    /* Cards list */
+    .cards{display:flex;flex-direction:column;gap:12px}
+    .card-head{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+    .title{font-size:16px;font-weight:700}
+    .meta{color:var(--muted);font-size:13px}
+    .actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+
+    /* Auth panel */
+    .auth{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Dorcas Year Planner — Travel</h1>
+    <div class="auth" id="authPanel">
+      <input type="email" id="email" placeholder="naam@dorcas.nl" />
+      <input type="password" id="password" placeholder="wachtwoord" />
+      <button class="btn" id="btnLogin">Inloggen</button>
+      <button class="btn" id="btnRegister">Account aanmaken</button>
+      <button class="btn hidden" id="btnLogout">Uitloggen</button>
+    </div>
+  </header>
+
+  <div class="main">
+    <div id="domainWarn" class="card hidden">Alleen <strong>@dorcas.nl</strong> accounts zijn toegestaan.</div>
+
+    <div class="grid">
+      <!-- ===== Nieuwe / Bewerken ===== -->
+      <section class="card">
+        <h3 style="margin:0 0 10px 0">Reis aanmaken / bewerken</h3>
+        <div class="row">
+          <div>
+            <label>Titel</label>
+            <input type="text" id="tripTitle" placeholder="Bijv. Field visit Ethiopia" />
+          </div>
+          <div>
+            <label>Afdeling</label>
+            <input type="text" id="tripDepartment" placeholder="Bijv. Programs" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label>Country Office (land)</label>
+            <input type="text" id="tripOffice" placeholder="Bijv. Ethiopia" />
+          </div>
+          <div>
+            <label>Plaats (optioneel)</label>
+            <input type="text" id="tripCity" placeholder="Bijv. Addis Abeba" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label>Startdatum</label>
+            <input type="date" id="tripStart"/>
+          </div>
+          <div>
+            <label>Einddatum</label>
+            <input type="date" id="tripEnd"/>
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label>Type</label>
+            <select id="tripType">
+              <option value="medewerker">Medewerker</option>
+              <option value="externe_partner">Externe Partner</option>
+            </select>
+          </div>
+          <div>
+            <label>Bedrijfsnaam/organisatie (optioneel)</label>
+            <input type="text" id="tripPartnerOrg" placeholder="Bijv. Local NGO" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label>Vervoer</label>
+            <select id="tripTransport">
+              <option value="vliegtuig">Vliegtuig</option>
+              <option value="trein">Trein</option>
+              <option value="auto">Auto</option>
+              <option value="anders">Anders</option>
+            </select>
+          </div>
+          <div>
+            <label>CombiCode (optioneel)</label>
+            <input type="text" id="tripCombiCode" placeholder="Bijv. ET-KE-Q4-1" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label>Purpose of travel (doel)</label>
+            <textarea id="tripPurpose" rows="3" placeholder="Korte beschrijving—waarom is deze reis nodig?"></textarea>
+          </div>
+          <div>
+            <label>IO Budget</label>
+            <div>
+              <input type="checkbox" id="tripIoBudget" checked />
+              <span class="meta">Aangevinkt = meenemen in budgetberekening.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label>Budget (default)</label>
+            <input type="text" id="tripBudget" value="2500" />
+            <div class="meta">Let op: Budget is standaard **default €2.500** p.p.</div>
+          </div>
+          <div>
+            <label>CO₂ (t) (default)</label>
+            <input type="text" id="tripCO2" value="2.5" />
+            <div class="meta">Let op: CO₂ is standaard **default 2,5 t** p.p.</div>
+          </div>
+        </div>
+
+        <div class="row">
+          <div>
+            <label>Duur (dagen)</label>
+            <input type="text" id="tripDuration" disabled placeholder="Automatisch berekend" />
+          </div>
+          <div>
+            <label>Kwartaal</label>
+            <input type="text" id="tripQtr" disabled placeholder="Automatisch bepaald (Q1–Q4)" />
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
+          <button id="tripReset" class="btn" type="button">Leegmaken</button>
+          <button id="tripSubmit" class="btn" type="button">Opslaan</button>
+        </div>
+      </section>
+
+      <!-- ===== Mijn Reizen ===== -->
+      <section class="card">
+        <h3 style="margin:0 0 10px 0">Mijn reizen</h3>
+
+        <div id="myTripsList" class="cards" style="margin-bottom:12px"></div>
+
+        <div class="card" style="padding:0;overflow:auto">
+          <table id="myTripsTable">
+            <thead>
+              <tr>
+                <th>Status</th>
+                <th>Titel</th>
+                <th>Afdeling</th>
+                <th>CO</th>
+                <th>Periode</th>
+                <th>Qtr</th>
+                <th>Dagen</th>
+                <th class="right">Budget/CO₂</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+      </section>
+    </div>
+  </div>
+
+  <!-- Firebase + App -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+    import {
+      getFirestore, collection, query, where, onSnapshot,
+      doc, getDoc, getDocs, setDoc, addDoc, deleteDoc, serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
+
+    // --- Firebase config (jouw project) ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyAh8NlJEsAimk5XetB46b4hVmT83ZbHc4o",
+      authDomain: "dorcas-travel-planner.firebaseapp.com",
+      projectId: "dorcas-travel-planner",
+      storageBucket: "dorcas-travel-planner.firebasestorage.app",
+      messagingSenderId: "964093814653",
+      appId: "1:964093814653:web:5f5a542f9593f82cfe0e14",
+      measurementId: "G-PZ3N4JRKQ3"
+    };
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth();
+    const db   = getFirestore();
+
+    // ---- helpers ----
+    const $ = (sel)=>document.querySelector(sel);
+    const fmtDate = (s => s ? new Date(s).toLocaleDateString('nl-NL') : '');
+    const daysBetween = ((a,b)=> Math.floor((new Date(b)-new Date(a))/(1000*60*60*24))+1);
+    const fmtEUR  = (n => new Intl.NumberFormat('nl-NL',{style:'currency',currency:'EUR'}).format(n||0));
+    const statusPill = (s=>{
+      const m=(s||'').toLowerCase();
+      if(m==='definitief') return '<span class="pill green"><span class="status-dot dot-green"></span>definitief</span>';
+      if(m==='afgewezen')  return '<span class="pill red"><span class="status-dot dot-red"></span>afgewezen</span>';
+      return '<span class="pill orange"><span class="status-dot dot-orange"></span>voorgenomen</span>';
+    });
+    const openDetails = (t=> alert(JSON.stringify(t,null,2)));
+    const safe = v => (v==null?'':String(v)).replace(/[<>&]/g, s=>({ '<':'&lt;','>':'&gt;','&':'&amp;' }[s]));
+
+    const emailEl = $('#email'), passEl = $('#password');
+    const btnLogin = $('#btnLogin'), btnRegister=$('#btnRegister'), btnLogout=$('#btnLogout');
+    const domainWarn = $('#domainWarn');
+
+    // ---- Auth UI ----
+    btnLogin.addEventListener('click', async ()=>{
+      try{
+        await signInWithEmailAndPassword(auth, emailEl.value.trim(), passEl.value);
+      }catch(e){ alert('Login: '+(e.code||e.message)); }
+    });
+    btnRegister.addEventListener('click', async ()=>{
+      try{
+        const mail = emailEl.value.trim();
+        if(!/@dorcas\.nl$/i.test(mail)) return alert('Gebruik een @dorcas.nl e-mail.');
+        await createUserWithEmailAndPassword(auth, mail, passEl.value);
+      }catch(e){ alert('Registreren: '+(e.code||e.message)); }
+    });
+    btnLogout.addEventListener('click', ()=> signOut(auth));
+
+    let currentUser = null;
+    onAuthStateChanged(auth, async (u)=>{
+      currentUser = u || null;
+      const isDorcas = /@dorcas\.nl$/i.test(u?.email||'');
+      domainWarn.classList.toggle('hidden', !!isDorcas);
+      $('#btnLogout').classList.toggle('hidden', !u);
+      $('#btnLogin').classList.toggle('hidden', !!u);
+      $('#btnRegister').classList.toggle('hidden', !!u);
+      emailEl.classList.toggle('hidden', !!u);
+      passEl.classList.toggle('hidden', !!u);
+      if(u && isDorcas){ loadMyTrips(); }
+    });
+    if (auth.currentUser) loadMyTrips();
+
+    // ======= FORM refs =======
+    const f = {
+      title: $('#tripTitle'),
+      dept: $('#tripDepartment'),
+      office: $('#tripOffice'),
+      city: $('#tripCity'),
+      start: $('#tripStart'),
+      end: $('#tripEnd'),
+      type: $('#tripType'),
+      partnerOrg: $('#tripPartnerOrg'),
+      transport: $('#tripTransport'),
+      combi: $('#tripCombiCode'),
+      purpose: $('#tripPurpose'),
+      ioBudget: $('#tripIoBudget'),
+      budget: $('#tripBudget'),
+      co2: $('#tripCO2'),
+      dur: $('#tripDuration'),
+      qtr: $('#tripQtr')
+    };
+    const btnSubmit = $('#tripSubmit'), btnReset = $('#tripReset');
+
+    // auto-derive velden
+    function derive(){
+      const s=f.start.value, e=f.end.value;
+      // duur
+      f.dur.value = (s && e) ? String(daysBetween(s,e)) : '';
+      // qtr
+      if (s){
+        const m = (new Date(s).getMonth()+1);
+        const q = m<=3?'Q1': m<=6?'Q2': m<=9?'Q3':'Q4';
+        f.qtr.value = q;
+      } else f.qtr.value = '';
+    }
+    [f.start, f.end].forEach(el=> el.addEventListener('change', derive));
+    f.combi.addEventListener('input', ()=>{}); // placeholder voor evt. live UI
+
+    btnReset.addEventListener('click', ()=>{
+      Object.values(f).forEach(el=>{
+        if (!el) return;
+        if (el.tagName==='INPUT' || el.tagName==='TEXTAREA' || el.tagName==='SELECT'){
+          if (el.type==='checkbox') el.checked = true;
+          else el.value = '';
+        }
+      });
+      f.ioBudget.checked = true;
+      f.budget.value = '2500';
+      f.co2.value = '2.5';
+      $('#tripSubmit').textContent = 'Opslaan';
+      window.editingTripId = null;
+    });
+
+    // ======= OPSLAAN =======
+    btnSubmit.addEventListener('click', async ()=>{
+      if(!auth.currentUser) return alert('Log eerst in.');
+      const title = f.title.value.trim();
+      const dept  = f.dept.value.trim();
+      const office= f.office.value.trim();
+      const city  = f.city.value.trim();
+      const start = f.start.value;
+      const end   = f.end.value;
+      const type  = f.type.value;
+      const partnerOrg = f.partnerOrg.value.trim();
+      const transport  = f.transport.value;
+      const combiCode  = f.combi.value.trim();
+      const purpose    = f.purpose.value.trim();
+      const ioBudget   = !!f.ioBudget.checked;
+      const budgetDefault = parseFloat(f.budget.value||'2500') || 2500;
+      const co2Default    = parseFloat(f.co2.value||'2.5') || 2.5;
+
+      if(!title) return alert('Titel is verplicht.');
+      if(!dept)  return alert('Afdeling is verplicht.');
+      if(!office)return alert('Country Office is verplicht.');
+      if(!start || !end) return alert('Start- en einddatum zijn verplicht.');
+      if(new Date(end) < new Date(start)) return alert('Einddatum moet later zijn dan startdatum.');
+
+      // afgeleiden
+      const m = (new Date(start).getMonth()+1);
+      const qtr = m<=3?'Q1': m<=6?'Q2': m<=9?'Q3':'Q4';
+      const duration = daysBetween(start,end);
+      const combiFactor = combiCode ? 0.5 : 1;
+      const budgetEffective = (ioBudget ? budgetDefault : 0) * combiFactor;
+      const co2Effective    = (co2Default * combiFactor);
+
+      const base = {
+        title, department:dept, officeCountry:office, city,
+        startDate:start, endDate:end, durationDays:duration, qtr,
+        type, partnerOrg, transport, purpose:purpose,
+        ioBudget, combiCode,
+        budgetDefaultTotal: budgetDefault,
+        budgetEffectiveTotal: budgetEffective,
+        co2TotalTon: co2Effective,                // we bewaren effective in co2TotalTon voor V1
+        co2EffectiveTotalTon: co2Effective,       // en apart, voor toekomst
+        travelerUid: auth.currentUser.uid,
+        status:'voorgenomen',
+        updatedAt: serverTimestamp()
+      };
+
+      try{
+        if (window.editingTripId){
+          await setDoc(doc(db,'trips', window.editingTripId), base, {merge:true});
+          window.editingTripId = null;
+          btnSubmit.textContent = 'Opslaan';
+          alert('Reis bijgewerkt.');
+        } else {
+          const created = await addDoc(collection(db,'trips'), {
+            ...base, createdAt: serverTimestamp()
+          });
+          // init approvals pending (optioneel, rules staan dit toe voor owner/admin)
+          try{
+            for (const step of ['manager','cd','hr']){
+              await setDoc(doc(db,`trips/${created.id}/approvals/${step}`),
+                { step, decision:'pending', decidedAt:null, note:'' }, {merge:true});
+            }
+          }catch(_){}
+          alert('Reis aangemaakt.');
+        }
+        loadMyTrips();
+        btnReset.click();
+      }catch(err){
+        alert('Opslaan: '+(err.code||err.message));
+      }
+    });
+
+    // ======= MIJN REIZEN =======
+    const myList = document.getElementById('myTripsList');
+    const myTableBody = document.querySelector('#myTripsTable tbody');
+    let _myTripsUnsub = null;
+    let _myTrips = [];
+    window.editingTripId = null;
+
+    function loadMyTrips(){
+      if(_myTripsUnsub){ _myTripsUnsub(); _myTripsUnsub=null; }
+      const u = auth.currentUser;
+      if(!u) return;
+
+      try{
+        const q = query(collection(db,'trips'), where('travelerUid','==', u.uid));
+        _myTripsUnsub = onSnapshot(q, handleSnap, handleErr);
+      }catch(e){
+        _myTripsUnsub = onSnapshot(collection(db,'trips'), (snap)=>{
+          const rows=[]; snap.forEach(d=> rows.push({id:d.id, ...d.data()}));
+          _myTrips = rows.filter(t => t.travelerUid === u.uid);
+          renderMyTrips();
+        }, handleErr);
+      }
+    }
+    function handleSnap(snap){
+      const rows=[]; snap.forEach(d=> rows.push({id:d.id, ...d.data()}));
+      _myTrips = rows;
+      renderMyTrips();
+    }
+    function handleErr(err){
+      alert('Mijn reizen: ' + (err.code||err.message));
+    }
+
+    async function renderMyTrips(){
+      if (myList) myList.innerHTML='';
+      if (myTableBody) myTableBody.innerHTML='';
+
+      if(!_myTrips.length){
+        const empty = '<div class="muted">Nog geen reizen.</div>';
+        if (myList) myList.innerHTML = empty;
+        if (myTableBody) myTableBody.innerHTML = `<tr><td colspan="9" class="muted">Nog geen reizen.</td></tr>`;
+        return;
+      }
+
+      // lees approvals voor notities/labels
+      const entries = [];
+      for (const t of _myTrips){
+        let ap = {};
+        try{
+          const aSnap = await getDocs(collection(db, `trips/${t.id}/approvals`));
+          aSnap.forEach(x=> ap[x.id]=x.data());
+        }catch(e){}
+        entries.push({trip:t, ap});
+      }
+
+      for (const {trip, ap} of entries){
+        const budget = trip.budgetEffectiveTotal ?? trip.budgetDefaultTotal ?? 0;
+        const co2    = (trip.co2EffectiveTotalTon ?? trip.co2TotalTon ?? 0).toFixed(1);
+        const days   = trip.durationDays || (trip.startDate && trip.endDate ? daysBetween(trip.startDate,trip.endDate) : '');
+        const notesBadge = buildNotesBadge(ap);
+
+        // cards
+        if (myList){
+          const html = `<div class="card" data-id="${trip.id}">
+            <div class="card-head">
+              <div>
+                <div class="title">${safe(trip.title||'(zonder titel)')}</div>
+                <div class="meta">${safe(trip.department||'')} • ${safe(trip.officeCountry||'')}${trip.city?(' • '+safe(trip.city)):""}</div>
+                <div class="meta">${fmtDate(trip.startDate)} – ${fmtDate(trip.endDate)} • ${safe(trip.qtr||'')} • ${days||''} dagen</div>
+              </div>
+              <div class="right" style="text-align:right">
+                <div>${statusPill(trip.status)}</div>
+                <div class="meta">Budget (default/eff.): <strong>${fmtEUR(trip.budgetDefaultTotal||0)}</strong> / <strong>${fmtEUR(budget)}</strong></div>
+                <div class="meta">CO₂ (t) (eff.): <strong>${co2}</strong></div>
+              </div>
+            </div>
+            <div class="actions">
+              ${notesBadge}
+              <button class="btn" data-details="${trip.id}">Toon details</button>
+              <button class="btn" data-edit="${trip.id}">Bewerk</button>
+              <button class="btn" data-delete="${trip.id}">Verwijder</button>
+            </div>
+          </div>`;
+          myList.insertAdjacentHTML('beforeend', html);
+        }
+
+        // tabel
+        if (myTableBody){
+          const row = `<tr data-id="${trip.id}">
+            <td>${statusPill(trip.status)}</td>
+            <td>${safe(trip.title||'')}</td>
+            <td>${safe(trip.department||'')}</td>
+            <td>${safe(trip.officeCountry||'')}${trip.city?(' • '+safe(trip.city)):""}</td>
+            <td>${fmtDate(trip.startDate)} – ${fmtDate(trip.endDate)}</td>
+            <td>${safe(trip.qtr||'')}</td>
+            <td>${days||''}</td>
+            <td class="right">${fmtEUR(budget)} • ${co2} t</td>
+            <td class="right">
+              ${notesBadge.replace('class="btn"', 'class="btn btn-sm"')}
+              <button class="btn btn-sm" data-details="${trip.id}">Toon details</button>
+              <button class="btn btn-sm" data-edit="${trip.id}">Bewerk</button>
+              <button class="btn btn-sm" data-delete="${trip.id}">Verwijder</button>
+            </td>
+          </tr>`;
+          myTableBody.insertAdjacentHTML('beforeend', row);
+        }
+      }
+
+      // events (delegatie)
+      const container = myList || myTableBody?.parentElement || document;
+      container.addEventListener('click', onMyTripsClick, { once:true });
+    }
+
+    function buildNotesBadge(ap){
+      const items = [];
+      if (ap.manager?.note) items.push(1);
+      if (ap.cd?.note)      items.push(1);
+      if (ap.hr?.note)      items.push(1);
+      if (!items.length) return '';
+      const label = items.length===1 ? '1 notitie' : `${items.length} notities`;
+      return `<button class="btn" data-notes="1" title="Toon review-notities">${label}</button>`;
+    }
+
+    async function onMyTripsClick(e){
+      const btn = e.target.closest('button'); if(!btn) return;
+      const row = btn.closest('[data-id]') || btn.closest('tr');
+      const id  = btn.dataset.details || btn.dataset.edit || btn.dataset.delete || (row && row.getAttribute('data-id'));
+
+      // DETAILS
+      if (btn.dataset.details){
+        try{
+          const s = await getDoc(doc(db,'trips', id));
+          if (s.exists()) openDetails({id, ...s.data()});
+        }catch(err){ alert('Details: ' + (err.code||err.message)); }
+        return;
+      }
+
+      // NOTITIES
+      if (btn.dataset.notes){
+        try {
+          const aSnap = await getDocs(collection(db, `trips/${id}/approvals`));
+          const ap={}; aSnap.forEach(x=> ap[x.id]=x.data());
+          const lines = [];
+          const fmt = ts => ts?.toDate ? ts.toDate().toLocaleString('nl-NL') : '';
+          if (ap.manager) lines.push(`Manager: ${ap.manager.decision||'pending'}${ap.manager.note?('\n- '+ap.manager.note):''} ${fmt(ap.manager.decidedAt)}`);
+          if (ap.cd)      lines.push(`CD: ${ap.cd.decision||'pending'}${ap.cd.note?('\n- '+ap.cd.note):''} ${fmt(ap.cd.decidedAt)}`);
+          if (ap.hr)      lines.push(`HR: ${ap.hr.decision||'pending'}${ap.hr.note?('\n- '+ap.hr.note):''} ${fmt(ap.hr.decidedAt)}`);
+          alert(lines.length ? lines.join('\n\n') : 'Geen notities beschikbaar.');
+        } catch(err){
+          alert('Notities: ' + (err.code||err.message));
+        }
+        return;
+      }
+
+      // BEWERK
+      if (btn.dataset.edit){
+        startEditTrip(id);
+        return;
+      }
+
+      // VERWIJDER
+      if (btn.dataset.delete){
+        const ok = confirm('Weet je zeker dat je deze reis wilt verwijderen?');
+        if (!ok) return;
+        try{
+          await deleteDoc(doc(db,'trips', id));
+        }catch(err){
+          alert('Verwijderen: ' + (err.code||err.message));
+        }
+        return;
+      }
+    }
+
+    async function startEditTrip(id){
+      try{
+        const s = await getDoc(doc(db,'trips', id));
+        if (!s.exists()) return alert('Reis niet gevonden.');
+        const t = {id, ...s.data()};
+        window.editingTripId = id;
+
+        // velden invullen
+        setVal('tripTitle', t.title);
+        setVal('tripDepartment', t.department);
+        setVal('tripOffice', t.officeCountry || t.country);
+        setVal('tripCity', t.city);
+        setVal('tripStart', t.startDate);
+        setVal('tripEnd', t.endDate);
+        setVal('tripQtr', t.qtr);
+        setVal('tripType', t.type);
+        setVal('tripTransport', t.transport);
+        setVal('tripCombiCode', t.combiCode || '');
+        setVal('tripPurpose', t.purpose || t.purposeOfTravel || '');
+        setVal('tripIoBudget', !!t.ioBudget);
+        setVal('tripPartnerOrg', t.partnerOrg || '');
+        setVal('tripBudget', (t.budgetDefaultTotal ?? 2500));
+        setVal('tripCO2', (t.co2EffectiveTotalTon ?? t.co2TotalTon ?? 2.5));
+        setVal('tripDuration', t.durationDays || '');
+        const submitBtn = document.getElementById('tripSubmit');
+        if (submitBtn) submitBtn.textContent = 'Wijzigingen opslaan';
+      }catch(err){
+        alert('Bewerken: ' + (err.code||err.message));
+      }
+    }
+    function setVal(id, val){
+      const el = document.getElementById(id);
+      if(!el) return;
+      if (el.type === 'checkbox') el.checked = !!val;
+      else el.value = (val ?? '');
+    }
+  </script>
+</body>
+</html>
