@@ -476,50 +476,46 @@ async function loadReviewQueue(){
   const myRole = (currentUserDoc?.role)||'traveler';
   const myStep = actorStepFromRole(myRole);
 
-  // Haal ALLE trips en filter client-side op pending, zodat je altijd iets ziet
-  const qTrips = query(collection(db,'trips')); 
+  // Haal ALLE trips; filter client-side naar pending (voorgenomen)
+  const qTrips = query(collection(db,'trips'));
   onSnapshot(qTrips, async (snap)=>{
-    const entries = [];
-    const jobs = [];
+    const entries=[]; const jobs=[];
     snap.forEach(d=>{
       const trip = {id:d.id, ...d.data()};
       jobs.push((async ()=>{
-        let ap = {};
-        try {
+        let ap={};
+        try{
           const aSnap = await getDocs(collection(db, `trips/${trip.id}/approvals`));
           aSnap.forEach(x=> ap[x.id]=x.data());
-        } catch(e) {
-          console.warn('[REVIEWS] approvals read failed', trip.id, e.code);
-          ap = {};
-        }
+        }catch(e){ console.warn('[REVIEWS] approvals read failed', trip.id, e.code); }
         entries.push({trip, ap});
       })());
     });
     await Promise.all(jobs);
 
-    // Alleen pending (status exact 'voorgenomen')
     const pending = entries.filter(({trip}) => (trip.status||'').toLowerCase()==='voorgenomen');
 
-    // Render
+    const reviewsList = document.getElementById('reviewsList');
+    if(!reviewsList) return;
     if(pending.length===0){
       reviewsList.innerHTML = '<div class="muted">Geen pending reizen gevonden.</div>';
       return;
     }
-    reviewsList.innerHTML = '';
 
+    reviewsList.innerHTML = '';
     pending.forEach(({trip, ap})=>{
       const mgr = ap.manager?.decision || 'pending';
       const cd  = ap.cd?.decision      || 'pending';
       const hr  = ap.hr?.decision      || 'pending';
 
-      // volgordelogica: wie mag nú beslissen?
+      // wie mag nu beslissen?
       const gateOK =
         (myStep==='manager') ||
         (myStep==='cd' && mgr==='approved') ||
         (myStep==='hr' && mgr==='approved' && cd==='approved');
 
       const myState = myStep ? (ap[myStep]?.decision || 'pending') : null;
-      const canAct = !!(myStep && gateOK && myState==='pending');
+      const canAct  = !!(myStep && gateOK && myState==='pending');
 
       const html = `<div class="card">
         <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
@@ -547,47 +543,9 @@ async function loadReviewQueue(){
       </div>`;
       reviewsList.insertAdjacentHTML('beforeend', html);
     });
-  });
+  }, (err)=> alert('Reviews: '+err.code+' — '+err.message));
 }
 
-// Acties (approve/reject/alt)
-reviewsList.addEventListener('click', async (e)=>{
-  const b = e.target.closest('button'); if(!b) return;
-
-  // Details blijft altijd werken
-  if (b.dataset.details) {
-    const id = b.dataset.details;
-    const s = await getDoc(doc(db,'trips', id));
-    if (s.exists()) openDetails({id, ...s.data()});
-    return;
-  }
-
-  const act   = b.dataset.act;
-  const tripId= b.dataset.trip;
-  const step  = b.dataset.step; // = 'manager'|'cd'|'hr' (admin → 'manager')
-  if(!step) return; // traveler heeft geen knoppen
-
-  const note = act==='alt' ? (prompt("Alternatief/reden:","")||'') : '';
-  const decision = act==='approve' ? 'approved' : (act==='reject' ? 'rejected' : 'alt');
-
-  try{
-    await setDoc(doc(db,`trips/${tripId}/approvals/${step}`), {
-      step, decision, note,
-      decidedAt: serverTimestamp(),
-      decidedByUid: currentUser.uid,
-      decidedByName: currentUser.displayName || currentUser.email
-    }, {merge:true});
-
-    // auto-finalize
-    const aSnap = await getDocs(collection(db,`trips/${tripId}/approvals`));
-    const ap = {}; aSnap.forEach(x=> ap[x.id]=x.data());
-    if(ap.manager?.decision==='approved' && ap.cd?.decision==='approved' && ap.hr?.decision==='approved'){
-      await setDoc(doc(db,'trips',tripId), { status:'definitief' }, {merge:true});
-      alert("Reis is definitief (groen).");
-    }
-  }catch(err){
-    alert(err.code + ' — ' + err.message);
-  }
 });
 
   // ---- CALENDAR (simple list by view) ----
