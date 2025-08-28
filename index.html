@@ -448,267 +448,156 @@
       rows.forEach(t=> tripsTableBody.insertAdjacentHTML('beforeend', rowTrip(t)));
     });
   }
-<!-- =============== REVIEWS (strakke opmaak) =============== -->
-<style>
-  /* Strakke cards en grotere velden */
-  .reviews-wrap { display:flex; flex-direction:column; gap:14px; }
-  .review-card { border:1px solid var(--line,#e6e6e6); border-radius:14px; background:#fff; padding:14px; }
-  .review-head { display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; }
-  .review-title { font-size:18px; font-weight:700; line-height:1.2; }
-  .review-meta  { color:#667085; font-size:13px; }
-  .review-pill  { display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:4px 10px; border-radius:999px; border:1px solid var(--line,#e6e6e6); background:#fafafa; }
-  .pill-green  { background:#ecfdf5; border-color:#bbf7d0; }
-  .pill-orange { background:#fff7ed; border-color:#fed7aa; }
-  .pill-red    { background:#fff1f2; border-color:#fecdd3; }
-  .dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
-  .dot-green  { background:#22c55e; } .dot-orange { background:#fb923c; } .dot-red { background:#ef4444; }
 
-  .review-grid { display:grid; grid-template-columns: minmax(160px, 240px) 1fr; gap:8px 16px; margin-top:10px; }
-  .review-label { color:#475467; font-size:14px; }
-  .review-value { font-size:15px; font-weight:500; }
-  .review-subtle{ color:#667085; font-weight:400; }
+ // ===================== REVIEWS (iedereen ziet pending; knoppen per rol) =====================
 
-  .review-approvals { display:grid; grid-template-columns: repeat(3, minmax(180px,1fr)); gap:8px; margin-top:10px; }
-  .approval-box { border:1px dashed #e5e7eb; border-radius:10px; padding:10px; background:#fcfcfc; }
-  .approval-title { font-size:13px; color:#475467; margin-bottom:6px; }
-  .approval-status { font-size:14px; font-weight:600; }
-  .approval-note { color:#475467; white-space:pre-wrap; font-size:13px; margin-top:6px; }
-  .approval-time { color:#98a2b3; font-size:12px; margin-top:4px; }
+// 1) DOM anchor
+const reviewsList = document.getElementById('reviewsList');
 
-  .review-actions { display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; margin-top:12px; }
-  .btn { border:1px solid #e6e6e6; background:#fff; padding:8px 12px; border-radius:10px; cursor:pointer; }
-  .btn[disabled] { opacity:.5; cursor:not-allowed; }
-</style>
+// 2) Helpers
+function actorStepFromRole(role){
+  const r = (role||'').toLowerCase();
+  if (r==='manager') return 'manager';
+  if (r==='cd')      return 'cd';
+  if (r==='hr')      return 'hr';
+  if (r==='admin')   return 'manager'; // admin handelt als manager
+  return null; // traveler etc.
+}
 
-<section id="tab-reviews" class="tab card">
-  <h3>Reviews</h3>
-  <div id="reviewsList" class="reviews-wrap"></div>
-</section>
+function approvalButtons(tripId, step, currentDecision){
+  const disabled = currentDecision!=='pending' ? 'disabled' : '';
+  return `<div style="display:flex;gap:6px">
+    <button class="btn" data-act="approve" data-trip="${tripId}" data-step="${step}" ${disabled}>Akkoord</button>
+    <button class="btn" data-act="reject"  data-trip="${tripId}" data-step="${step}" ${disabled}>Afwijzen</button>
+    <button class="btn" data-act="alt"     data-trip="${tripId}" data-step="${step}" ${disabled}>Alternatief</button>
+  </div>`;
+}
 
-<script type="module">
-  // ==== Imports (veilig om opnieuw te importeren) ====
-  import {
-    getFirestore, collection, query, onSnapshot, getDocs, setDoc,
-    doc, serverTimestamp
-  } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
-  import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-auth.js";
+// 3) Loader
+function loadReviewQueue(){
+  if(!currentUser) return;
 
-  // ==== DB/Auth (gebruik bestaande als aanwezig) ====
-  const db   = (window.db || getFirestore());
-  const auth = getAuth();
+  const myRole = (currentUserDoc?.role)||'traveler';
+  const myStep = actorStepFromRole(myRole);
 
-  // ==== Helpers / fallbacks ====
-  const fmtDate = window.fmtDate || (s => s ? new Date(s).toLocaleDateString('nl-NL') : '');
-  const fmtEUR  = window.fmtEUR  || (n => new Intl.NumberFormat('nl-NL',{style:'currency',currency:'EUR'}).format(n||0));
-  const statusPill = (s)=>{
-    const m=(s||'').toLowerCase();
-    if(m==='definitief') return `<span class="review-pill pill-green"><span class="dot dot-green"></span>definitief</span>`;
-    if(m==='afgewezen')  return `<span class="review-pill pill-red"><span class="dot dot-red"></span>afgewezen</span>`;
-    return `<span class="review-pill pill-orange"><span class="dot dot-orange"></span>voorgenomen</span>`;
-  };
-  const safe = v => (v==null?'':String(v)).replace(/[<>&]/g, s=>({ '<':'&lt;','>':'&gt;','&':'&amp;' }[s]));
-  const tsNL = ts => ts?.toDate ? ts.toDate().toLocaleString('nl-NL') : '';
+  // Haal ALLE trips; filter client-side naar 'voorgenomen' zodat je altijd iets ziet
+  const qTrips = query(collection(db,'trips'));
+  onSnapshot(qTrips, async (snap)=>{
+    const entries=[]; const jobs=[];
+    snap.forEach(d=>{
+      const trip = {id:d.id, ...d.data()};
+      jobs.push((async ()=>{
+        let ap={};
+        try{
+          const aSnap = await getDocs(collection(db, `trips/${trip.id}/approvals`));
+          aSnap.forEach(x=> ap[x.id]=x.data());
+        }catch(e){
+          console.warn('[REVIEWS] approvals read failed', trip.id, e.code);
+          ap = {};
+        }
+        entries.push({trip, ap});
+      })());
+    });
+    await Promise.all(jobs);
 
-  function actorStepFromRole(role){
-    const r=(role||'').toLowerCase();
-    if(r==='manager') return 'manager';
-    if(r==='cd')      return 'cd';
-    if(r==='hr')      return 'hr';
-    if(r==='admin')   return 'manager'; // admin handelt als manager
-    return null;
-  }
+    const pending = entries.filter(({trip}) => (trip.status||'').toLowerCase()==='voorgenomen');
 
-  // ==== State ====
-  let currentUser = auth.currentUser || null;
-  let currentUserDoc = window.currentUserDoc || null; // als je die elders vult
-  let unsubReviews = null;
-
-  onAuthStateChanged(auth, u => { currentUser = u || null; if(u) loadReviewQueue(); });
-
-  // ==== Loader ====
-  function loadReviewQueue(){
-    if(!currentUser) return;
-    const qTrips = query(collection(db,'trips'));
-    unsubReviews?.();
-    unsubReviews = onSnapshot(qTrips, async (snap)=>{
-      const entries=[]; const jobs=[];
-      snap.forEach(d=>{
-        const trip = {id:d.id, ...d.data()};
-        jobs.push((async ()=>{
-          const ap={};
-          try{
-            const aSnap = await getDocs(collection(db, `trips/${trip.id}/approvals`));
-            aSnap.forEach(x=> ap[x.id]=x.data());
-          }catch(_) {}
-          entries.push({trip, ap});
-        })());
-      });
-      await Promise.all(jobs);
-
-      // Standaard: toon pending/voorgenomen bovenaan
-      const sorted = entries.sort((a,b)=>(a.trip.startDate||'').localeCompare(b.trip.startDate||''));
-      renderReviews(sorted);
-    }, (err)=> showError('Reviews: '+(err.code||err.message)));
-  }
-
-  // ==== Render ====
-  const reviewsList = document.getElementById('reviewsList');
-
-  function renderReviews(items){
     if(!reviewsList) return;
-    const myRole = (currentUserDoc?.role)||'traveler';
-    const myStep = actorStepFromRole(myRole);
-
-    // Eerst pending (voorgenomen), dan rest
-    const pending = items.filter(x => (x.trip.status||'').toLowerCase()==='voorgenomen');
-    const others  = items.filter(x => (x.trip.status||'').toLowerCase()!=='voorgenomen');
-    const all = [...pending, ...others];
-
-    if(all.length===0){
-      reviewsList.innerHTML = '<div class="review-meta">Geen reizen gevonden.</div>';
+    if(pending.length===0){
+      reviewsList.innerHTML = '<div class="muted">Geen pending reizen gevonden.</div>';
       return;
     }
 
     reviewsList.innerHTML = '';
-    all.forEach(({trip, ap})=>{
+    pending.forEach(({trip, ap})=>{
       const mgr = ap.manager?.decision || 'pending';
       const cd  = ap.cd?.decision      || 'pending';
       const hr  = ap.hr?.decision      || 'pending';
 
-      // Gate: wie mag nu beslissen?
+      // wie mag nu beslissen?
       const gateOK =
         (myStep==='manager') ||
         (myStep==='cd' && mgr==='approved') ||
         (myStep==='hr' && mgr==='approved' && cd==='approved');
+
       const myState = myStep ? (ap[myStep]?.decision || 'pending') : null;
       const canAct  = !!(myStep && gateOK && myState==='pending');
 
-      // Waarden
-      const purpose = trip.purpose || trip.purposeOfTravel || '';
-      const budget  = (trip.budgetEffectiveTotal ?? trip.budgetDefaultTotal ?? 0);
-      const co2     = (trip.co2EffectiveTotalTon ?? trip.co2TotalTon ?? 0);
-      const days    = trip.durationDays ?? '';
-
-      // Approvals blokken
-      const box = (title, rec)=>{
-        const d = (rec?.decision)||'pending';
-        const pill =
-          d==='approved' ? `<span class="review-pill pill-green"><span class="dot dot-green"></span>approved</span>` :
-          d==='rejected' ? `<span class="review-pill pill-red"><span class="dot dot-red"></span>rejected</span>` :
-          d==='alt'      ? `<span class="review-pill"><span class="dot dot-orange"></span>alternatief</span>` :
-                           `<span class="review-pill"><span class="dot dot-orange"></span>pending</span>`;
-        return `<div class="approval-box">
-          <div class="approval-title">${title}</div>
-          <div class="approval-status">${pill}</div>
-          ${rec?.note ? `<div class="approval-note">${safe(rec.note)}</div>` : ''}
-          ${rec?.decidedAt ? `<div class="approval-time">${tsNL(rec.decidedAt)}</div>` : ''}
-        </div>`;
-      };
-
-      const card = `
-        <div class="review-card" data-id="${trip.id}">
-          <div class="review-head">
-            <div>
-              <div class="review-title">${safe(trip.title||'(zonder titel)')}</div>
-              <div class="review-meta">${safe(trip.department||'')} • ${safe(trip.officeCountry||'')}${trip.city?(' • '+safe(trip.city)):""}</div>
-              <div class="review-meta">${fmtDate(trip.startDate)} – ${fmtDate(trip.endDate)} • ${safe(trip.qtr||'')} ${days?('• '+days+' dagen'):''}</div>
+      const html = `<div class="card">
+        <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap">
+          <div>
+            <strong>${trip.title || '(zonder titel)'}</strong><br/>
+            <span class="muted">${trip.department||''} • ${trip.officeCountry||''}${trip.city?(' • '+trip.city):''}</span><br/>
+            <span class="muted">${fmtDate(trip.startDate)} – ${fmtDate(trip.endDate)} • ${trip.qtr||''}</span>
+          </div>
+          <div>
+            <div>${statusPill(trip.status)}</div>
+            <div class="muted right">
+              ${fmtEUR(trip.budgetEffectiveTotal ?? trip.budgetDefaultTotal ?? 0)} •
+              ${(trip.co2EffectiveTotalTon ?? trip.co2TotalTon ?? 0).toFixed(1)} t
             </div>
-            <div class="right" style="text-align:right">
-              <div>${statusPill(trip.status)}</div>
-              <div class="review-meta">Budget (default): <strong>${fmtEUR(budget)}</strong></div>
-              <div class="review-meta">CO₂ (t) (default): <strong>${(co2||0).toFixed(2)}</strong></div>
-            </div>
-          </div>
-
-          <div class="review-grid">
-            <div class="review-label">Purpose of travel</div>
-            <div class="review-value">${safe(purpose||'(geen doel opgegeven)')}</div>
-
-            <div class="review-label">Type</div>
-            <div class="review-value">${safe(trip.type||'')}</div>
-
-            <div class="review-label">Vervoer</div>
-            <div class="review-value">${safe(trip.transport||'')}</div>
-
-            <div class="review-label">Externe partner (bedrijf/organisatie)</div>
-            <div class="review-value">${safe(trip.partnerOrg||'')}</div>
-
-            <div class="review-label">IO Budget</div>
-            <div class="review-value">${trip.ioBudget ? 'Ja' : 'Nee'}</div>
-
-            <div class="review-label">CombiCode</div>
-            <div class="review-value">${safe(trip.combiCode||'')}</div>
-
-            <div class="review-label">Reiziger UID</div>
-            <div class="review-value review-subtle">${safe(trip.travelerUid||'')}</div>
-
-            <div class="review-label">Document ID</div>
-            <div class="review-value review-subtle">${safe(trip.id)}</div>
-          </div>
-
-          <div class="review-approvals">
-            ${box('Manager', ap.manager)}
-            ${box('Country Director', ap.cd)}
-            ${box('HR / Safety', ap.hr)}
-          </div>
-
-          <div class="review-actions">
-            ${canAct ? `
-              <button class="btn" data-act="approve" data-trip="${trip.id}" data-step="${actorStepFromRole(currentUserDoc?.role)}">Akkoord</button>
-              <button class="btn" data-act="reject"  data-trip="${trip.id}" data-step="${actorStepFromRole(currentUserDoc?.role)}">Afwijzen</button>
-              <button class="btn" data-act="alt"     data-trip="${trip.id}" data-step="${actorStepFromRole(currentUserDoc?.role)}">Alternatief</button>
-            ` : ''}
           </div>
         </div>
-      `;
-      reviewsList.insertAdjacentHTML('beforeend', card);
+
+        <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap">
+          <div>Manager: <strong>${mgr}</strong></div>
+          <div>CD: <strong>${cd}</strong></div>
+          <div>HR: <strong>${hr}</strong></div>
+        </div>
+
+        <div style="margin-top:8px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+          ${canAct ? approvalButtons(trip.id, myStep, myState) : ''}
+          <button class="btn" data-details="${trip.id}">Toon details</button>
+        </div>
+      </div>`;
+      reviewsList.insertAdjacentHTML('beforeend', html);
     });
+  }, (err)=> alert('Reviews: '+err.code+' — '+err.message));
+}
+
+// 4) Click-handler
+reviewsList?.addEventListener('click', async (e)=>{
+  const b = e.target.closest('button'); if(!b) return;
+
+  // details
+  if (b.dataset.details){
+    const id = b.dataset.details;
+    const s = await getDoc(doc(db,'trips', id));
+    if (s.exists()) openDetails({id, ...s.data()});
+    return;
   }
 
-  function showError(msg){
-    if (!reviewsList) return;
-    reviewsList.innerHTML = `<div class="review-meta" style="color:#b42318">${msg}</div>`;
-  }
+  const act    = b.dataset.act;
+  const tripId = b.dataset.trip;
+  let step     = b.dataset.step;
+  if (!step) step = actorStepFromRole(currentUserDoc?.role);
+  if (!step) return; // traveler heeft geen knoppen
 
-  // ==== Click handler: approve / reject / alt ====
-  document.getElementById('reviewsList')?.addEventListener('click', async (e)=>{
-    const btn = e.target.closest('button'); if(!btn) return;
+  const note = act==='alt' ? (prompt("Alternatief/reden:","")||'') : '';
+  const decision = act==='approve' ? 'approved' : (act==='reject' ? 'rejected' : 'alt');
 
-    const act    = btn.dataset.act;
-    const tripId = btn.dataset.trip;
-    let step     = btn.dataset.step;
+  try{
+    await setDoc(doc(db,`trips/${tripId}/approvals/${step}`), {
+      step, decision, note,
+      decidedAt: serverTimestamp(),
+      decidedByUid: currentUser.uid,
+      decidedByName: currentUser.displayName || currentUser.email
+    }, { merge:true });
 
-    const role = (currentUserDoc?.role)||'traveler';
-    if (!step) step = actorStepFromRole(role);
-    if (!step || !tripId || !currentUser) return;
-
-    const note = act==='alt' ? (prompt("Alternatief/reden:","")||'') : '';
-    const decision = act==='approve' ? 'approved' : (act==='reject' ? 'rejected' : 'alt');
-
-    try{
-      await setDoc(doc(db,`trips/${tripId}/approvals/${step}`), {
-        step, decision, note,
-        decidedAt: serverTimestamp(),
-        decidedByUid: currentUser.uid,
-        decidedByName: currentUser.displayName || currentUser.email
-      }, { merge:true });
-
-      // Auto-definitief na 3× approved
-      const aSnap = await getDocs(collection(db,`trips/${tripId}/approvals`));
-      const ap = {}; aSnap.forEach(x=> ap[x.id]=x.data());
-      if(ap.manager?.decision==='approved' && ap.cd?.decision==='approved' && ap.hr?.decision==='approved'){
-        await setDoc(doc(db,'trips',tripId), { status:'definitief' }, { merge:true });
-        alert("Reis is definitief (groen).");
-      }
-    }catch(err){
-      alert(err.code + ' — ' + err.message);
+    // auto-definitief na 3x approved
+    const aSnap = await getDocs(collection(db,`trips/${tripId}/approvals`));
+    const ap = {}; aSnap.forEach(x=> ap[x.id]=x.data());
+    if(ap.manager?.decision==='approved' && ap.cd?.decision==='approved' && ap.hr?.decision==='approved'){
+      await setDoc(doc(db,'trips',tripId), { status:'definitief' }, {merge:true});
+      alert("Reis is definitief (groen).");
     }
-  });
+  }catch(err){
+    alert(err.code + ' — ' + err.message);
+  }
+});
 
-  // ==== Start ====
-  if (auth.currentUser) loadReviewQueue();
-</script>
-<!-- =============== /REVIEWS (strakke opmaak) =============== -->
+// 5) Zorg dat deze loader na login wordt aangeroepen (bij jou gebeurt dat al in onAuthStateChanged):
+// onAuthStateChanged(auth, ()=>{ ... loadReviewQueue(); ... });
 
   // ---- CALENDAR (simple list by view) ----
   const calView=$("#calView"), calQtr=$("#calQtr"), calMonth=$("#calMonth"), calWeek=$("#calWeek"), calendarArea=$("#calendarArea");
