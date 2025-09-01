@@ -273,8 +273,8 @@
     function filterRows(){
       ensureDefaultYearRange();
       const s = (calStatus.value||'').toLowerCase();
-      const dep = calDept.value || '';
-      const off = calOffice.value || '';
+      const dep = (calDept.value||'').tolowerCase();
+      const off = (calOffice.value||'').tolowerCase();
       const qtr = calQtr.value || '';
       const from = calFrom.value || '';
       const to   = calTo.value   || '';
